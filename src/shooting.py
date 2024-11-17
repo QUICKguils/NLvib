@@ -2,6 +2,7 @@
 
 # TODO:
 # - think of a better handling of forces arguments
+# - more robust y and x deps
 # - better docstring, clean up obsolete comments
 
 from typing import NamedTuple
@@ -49,56 +50,104 @@ class NLSystem:
         self.ndof_ss = 2*self.ndof
 
         self.L = np.vstack((np.hstack((null, identity)), np.hstack((-M_inv@self.K, -M_inv@self.C))))
-        self.g_nl = lambda y: np.concatenate((np.zeros(self.ndof), M_inv@self.f_nl(y[:len(y)//2], y[len(y)//2:])))
+        self.g_nl  = lambda y:    np.concatenate((np.zeros(self.ndof), M_inv@self.f_nl(y[:len(y)//2], y[len(y)//2:])))
         self.g_ext = lambda w, t: np.concatenate((np.zeros(self.ndof), M_inv@self.f_ext(w, t)))
 
         self.integrand = lambda t, y, w: self.L@y - self.g_nl(y) + self.g_ext(w, t)
 
 
-def shooting(sys: NLSystem, y0_guess, tdiv: TimeDivision):
+class ShootingSolution(NamedTuple):
+    """Solution of a BVP via the shooting method.
+    y0  -- IC solution of the BVP, for the desired tdiv.
+    max -- Corresponding DOFs maximum displacement.
+    """
+    tdiv: TimeDivision
+    y0:   np.ndarray
+    max:  np.ndarray
+
+
+def shooting(sys: NLSystem, y0_guess, tdiv: TimeDivision) -> ShootingSolution:
     """Shooting method to solve the BVP."""
 
     def objective(y0):
         """Function to be minimized: difference between y(0) and y(T)."""
         sol = solve_ivp(sys.integrand, [0, tdiv.T], y0, t_eval=[tdiv.T], args=(tdiv.w,))
-        yT = sol.y[:, 0]
+        yT = sol.y[:, -1]
         return yT - y0
 
-    return root(objective, y0_guess).x
+    y0 = root(objective, y0_guess).x
+
+    y = solve_ivp(sys.integrand, [0, tdiv.T], y0, args=(tdiv.w,), dense_output=True).sol
+    min_dof1 = minimize_scalar(lambda t: y(t)[0], bounds=(0, tdiv.T))
+    min_dof2 = minimize_scalar(lambda t: y(t)[1], bounds=(0, tdiv.T))
+    max = [-min_dof1.fun, -min_dof2.fun]
+
+    return ShootingSolution(tdiv=tdiv, y0=y0, max=max)
 
 
-def basic_continuation(sys: NLSystem, y0_guess, tdiv_range):
+class ContinuationSolution(NamedTuple):
+    """Solution of a sequential continuation computation.
+    y0_range  -- IC solutions of the BVP, for the desired tdiv_range.
+    max_range -- Corresponding DOFs maximum displacement.
+    """
+    tdiv_range: np.ndarray
+    y0_range:   np.ndarray
+    max_range:  np.ndarray
+
+
+def basic_continuation(sys: NLSystem, y0_guess, tdiv_range) -> ContinuationSolution:
     """Basic sequential continuation, without prediction and correction."""
 
-    class Solution(NamedTuple):
-        """Solution of the basic continuation.
-        y0_range  -- IC solutions of the BVP, for the desired w_range.
-        max_range -- Corresponding DOFs maximum displacement.
-        """
-        tdiv_range: np.ndarray
-        y0_range: np.ndarray
-        max_range: np.ndarray
-
-    y0_range = np.zeros((sys.ndof_ss, tdiv_range.size))
-    max_range = np.zeros((sys.ndof, tdiv_range.size))
+    y0_range  = np.zeros((sys.ndof_ss, tdiv_range.size))
+    max_range = np.zeros((sys.ndof,    tdiv_range.size))
 
     for (idx, tdiv) in enumerate(tdiv_range):
-        # BVP solution for the excitation frequency w
-        y0 = shooting(sys, y0_guess, tdiv)
-        y0_range[:, idx] = y0
+        sol = shooting(sys, y0_guess, tdiv)
+        y0_range[:, idx]  = sol.y0
+        max_range[:, idx] = sol.max
 
-        # Amplitude maxima
-        y = solve_ivp(sys.integrand, [0, tdiv.T], y0, args=(tdiv.w,), dense_output=True).sol
-        min_dof1 = minimize_scalar(lambda t: y(t)[0], bounds=(0, tdiv.T))
-        min_dof2 = minimize_scalar(lambda t: y(t)[1], bounds=(0, tdiv.T))
-        max_range[:, idx] = [-min_dof1.fun, -min_dof2.fun]
+        # Basic continuation: the prediction of y0 for the next frequency
+        # is simply the current solution.
+        y0_guess = sol.y0
 
-        # Update guess for next frequency
-        y0_guess = y0
+    return ContinuationSolution(
+        tdiv_range = tdiv_range,
+        y0_range   = y0_range,
+        max_range  = max_range
+    )
 
-    return Solution(tdiv_range=tdiv_range, y0_range=y0_range, max_range=max_range)
 
+def secant_continuation(sys: NLSystem, y0_guess, tdiv_range) -> ContinuationSolution:
+    """Sequential continuation, with secant prediction."""
 
-def advanced_continuation(sys: NLSystem, y0_guess, w_range):
-    """Sequential continuation, with prediction and correction."""
-    # TODO: if time, obtain nice spikes
+    y0_range  = np.zeros((sys.ndof_ss, tdiv_range.size))
+    max_range = np.zeros((sys.ndof,    tdiv_range.size))
+
+    sol_pprev = shooting(sys, y0_guess, tdiv_range[0])
+    y0_range[:, 0]  = y0_pprev = sol_pprev.y0
+    max_range[:, 0] = sol_pprev.max
+
+    sol_prev = shooting(sys, y0_pprev, tdiv_range[0])
+    y0_range[:, 1]  = y0_prev = sol_prev.y0
+    max_range[:, 1] = sol_prev.max
+
+    for (shifted_idx, tdiv) in enumerate(tdiv_range[2:]):
+        idx = shifted_idx + 2  # TODO: not elegant
+
+        # Secant continuation: the prediction of y0 for the next frequency
+        # is the linear extrapolation of the two previous solutions.
+        # WARN: assume a linear spacing between the tdiv
+        y0_guess = 2*y0_prev - y0_pprev
+
+        sol = shooting(sys, y0_guess, tdiv)
+        y0_range[:, idx]  = sol.y0
+        max_range[:, idx] = sol.max
+
+        y0_pprev = y0_prev
+        y0_prev  = sol.y0
+
+    return ContinuationSolution(
+        tdiv_range = tdiv_range,
+        y0_range   = y0_range,
+        max_range  = max_range
+    )
