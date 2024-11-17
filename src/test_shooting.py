@@ -126,5 +126,5 @@ def test_continuation(sys, continuation=shooting.basic_continuation):
 
 if __name__ == '__main__':
     sys = test_system()
-    test_shooting(sys)
-    # solutions = test_continuation(sys)
+    shooting_sol = test_shooting(sys)
+    continuation_solutions = test_continuation(sys)
