@@ -18,17 +18,23 @@ from utils.tdiv import TimeDivision
 class NLSystem:
     """NLSystem -- Implement a nonlinear system."""
 
-    def __init__(self, M, C, K, f_nl):
-        """Generic equations of motion of a free nonlinear system.
+    def __init__(self, M, K, f_nl):
+        """Generic equations of motion of an undamped, free nonlinear system.
 
-        M*x_ddot(t) + C*x_dot(t) + K*x(t) + f_nl(x, x_dot) = 0
+        M*x_ddot(t) + K*x(t) + f_nl(x, x_dot) = 0
         """
         self.ndof = M.shape[0]
 
         self.M = M
-        self.C = C
         self.K = K
         self.f_nl = f_nl
+
+    def add_damping(self, C):
+        """Add linear damping to the NL system.
+
+        M*x_ddot(t) + C*x_dot(t) + K*x(t) + f_nl(x, x_dot) = 0
+        """
+        self.C = C
 
     def add_harmonic_excitation(self, amplitude=1):
         """Add an external harmonic excitation to the NL system.
@@ -38,8 +44,22 @@ class NLSystem:
         # WARN: only add to node 1
         self.f_ext = lambda w, t: np.array([amplitude*np.sin(w*t), 0])
 
-    def build_state_space(self):
+    def build_undamped_free_state_space(self):
+        """Recast in first order state-space form:
 
+        y_dot(t) = L*y(t) - g_nl(y) , with y = [x, x_dot]
+        """
+        identity = np.eye(self.ndof)
+        null = np.zeros((self.ndof, self.ndof))
+        M_inv = linalg.inv(self.M)
+        self.ndof_ss = 2*self.ndof
+
+        self.L = np.vstack((np.hstack((null, identity)), np.hstack((-M_inv@self.K, null))))
+        self.g_nl = lambda y: np.concatenate((np.zeros(self.ndof), M_inv@self.f_nl(y[:len(y)//2], y[len(y)//2:])))
+
+        self.integrand = lambda t, y, w: self.L@y - self.g_nl(y)
+
+    def build_damped_forced_state_space(self):
         """Recast in first order state-space form:
 
         y_dot(t) = L*y(t) - g_nl(y) + g_ext(w, t) , with y = [x, x_dot]
@@ -73,9 +93,11 @@ def shooting(sys: NLSystem, y0_guess, tdiv: TimeDivision) -> ShootingSolution:
         """Function to be minimized: difference between y(0) and y(T)."""
         sol = solve_ivp(sys.integrand, [0, tdiv.T], y0, t_eval=[tdiv.T], args=(tdiv.w,))
         yT = sol.y[:, -1]
-        return yT - y0
+        return (yT - y0)
 
-    y0 = root(objective, y0_guess).x
+    sol = root(objective, y0_guess)
+    print("shooting success: ", sol.success)
+    y0 = sol.x
 
     y = solve_ivp(sys.integrand, [0, tdiv.T], y0, args=(tdiv.w,), dense_output=True).sol
     min_dof1 = minimize_scalar(lambda t: y(t)[0], bounds=(0, tdiv.T))
