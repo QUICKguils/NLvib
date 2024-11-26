@@ -43,6 +43,7 @@ plt.rcParams['figure.dpi'] = 200
 #     ]).T
 #     return f_assumed @ nl_coeffs
 
+
 def build_undamped_free_system(f_nl):
     # Linear system matrices
     M = np.eye(2)
@@ -91,7 +92,7 @@ def test_shooting(sys, y0_guess, freq_Hz):
 
     # Verify that the BVP has been solved correctly
     y = solve_ivp(sys.integrand, [0, 2*tdiv.T], sol_shooting.y0, args=(tdiv.w,), dense_output=True).sol
-    t_sample = np.linspace(0, 2*tdiv.T, 200)
+    t_sample = np.linspace(0, tdiv.T, 200)
     plt.plot(t_sample, y(t_sample)[:2, :].T)
     plt.legend(['x1', 'x2'])
     # plt.plot(y(t_sample)[0, :].T, y(t_sample)[1, :].T)
@@ -153,7 +154,7 @@ def test_nnm(sys, y0_guess, continuation=shooting.basic_continuation):
     """Compute NNMs and backbones with sequential continuation."""
 
     f_ranges = [
-        np.linspace(18, 14, 200),
+        np.linspace(15.915, 15, 300),
     ]
 
     # Build the associated time divisions
@@ -183,9 +184,9 @@ def test_nnm(sys, y0_guess, continuation=shooting.basic_continuation):
 if __name__ == '__main__':
     # Set simulation parameters
     f_ext_ampl = 50
-    f_ext_freq = 18
-    y0_guess = 1E-6 * np.array([15, 20, 0, 0])
-    f_nl = lambda x, x_dot: np.array([-2E4*x[0]**3, 0])
+    f_ext_freq = 15.915
+    y0_guess = 1E-2 * np.array([1, 1, 0, 0])
+    f_nl = lambda x, x_dot: np.array([-1E4*x[0]**3, 0])
 
     # Test the code
     sys_free = build_undamped_free_system(f_nl)
