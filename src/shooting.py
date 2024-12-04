@@ -3,77 +3,15 @@
 # TODO:
 # - think of a better handling of forces arguments
 # - more robust y and x deps
-# - better docstring, clean up obsolete comments
 
 from typing import NamedTuple
 
+import matplotlib.pyplot as plt
 import numpy as np
-from scipy import linalg
 from scipy.integrate import solve_ivp
-from scipy.optimize import root, minimize_scalar
+from scipy.optimize import root
 
-from utils.tdiv import TimeDivision
-
-
-class NLSystem:
-    """NLSystem -- Implement a nonlinear system."""
-
-    def __init__(self, M, K, f_nl):
-        """Generic equations of motion of an undamped, free nonlinear system.
-
-        M*x_ddot(t) + K*x(t) + f_nl(x, x_dot) = 0
-        """
-        self.ndof = M.shape[0]
-
-        self.M = M
-        self.K = K
-        self.f_nl = f_nl
-
-    def add_damping(self, C):
-        """Add linear damping to the NL system.
-
-        M*x_ddot(t) + C*x_dot(t) + K*x(t) + f_nl(x, x_dot) = 0
-        """
-        self.C = C
-
-    def add_harmonic_excitation(self, amplitude=1):
-        """Add an external harmonic excitation to the NL system.
-
-        M*x_ddot(t) + C*x_dot(t) + K*x(t) + f_nl(x, x_dot) = f_ext(w, t)
-        """
-        # WARN: only add to node 1
-        self.f_ext = lambda w, t: np.array([amplitude*np.sin(w*t), 0])
-
-    def build_undamped_free_state_space(self):
-        """Recast in first order state-space form:
-
-        y_dot(t) = L*y(t) - g_nl(y) , with y = [x, x_dot]
-        """
-        identity = np.eye(self.ndof)
-        null = np.zeros((self.ndof, self.ndof))
-        M_inv = linalg.inv(self.M)
-        self.ndof_ss = 2*self.ndof
-
-        self.L = np.vstack((np.hstack((null, identity)), np.hstack((-M_inv@self.K, null))))
-        self.g_nl = lambda y: np.concatenate((np.zeros(self.ndof), M_inv@self.f_nl(y[:len(y)//2], y[len(y)//2:])))
-
-        self.integrand = lambda t, y, w: self.L@y - self.g_nl(y)
-
-    def build_damped_forced_state_space(self):
-        """Recast in first order state-space form:
-
-        y_dot(t) = L*y(t) - g_nl(y) + g_ext(w, t) , with y = [x, x_dot]
-        """
-        identity = np.eye(self.ndof)
-        null = np.zeros((self.ndof, self.ndof))
-        M_inv = linalg.inv(self.M)
-        self.ndof_ss = 2*self.ndof
-
-        self.L = np.vstack((np.hstack((null, identity)), np.hstack((-M_inv@self.K, -M_inv@self.C))))
-        self.g_nl  = lambda y:    np.concatenate((np.zeros(self.ndof), M_inv@self.f_nl(y[:len(y)//2], y[len(y)//2:])))
-        self.g_ext = lambda w, t: np.concatenate((np.zeros(self.ndof), M_inv@self.f_ext(w, t)))
-
-        self.integrand = lambda t, y, w: self.L@y - self.g_nl(y) + self.g_ext(w, t)
+from nlsys import NLSystem, TimeDivision
 
 
 class ShootingSolution(NamedTuple):
@@ -117,10 +55,12 @@ class ContinuationSolution(NamedTuple):
     """Solution of a sequential continuation computation.
     y0_range  -- IC solutions of the BVP, for the desired tdiv_range.
     max_range -- Corresponding DOFs maximum displacement.
+    max_range -- Corresponding DOFs minimum displacement.
     """
     tdiv_range: np.ndarray
     y0_range:   np.ndarray
     max_range:  np.ndarray
+    min_range:  np.ndarray
 
 
 def basic_continuation(sys: NLSystem, y0_guess, tdiv_range) -> ContinuationSolution:
@@ -128,11 +68,13 @@ def basic_continuation(sys: NLSystem, y0_guess, tdiv_range) -> ContinuationSolut
 
     y0_range  = np.zeros((sys.ndof_ss, tdiv_range.size))
     max_range = np.zeros((sys.ndof,    tdiv_range.size))
+    min_range = np.zeros((sys.ndof,    tdiv_range.size))
 
     for (idx, tdiv) in enumerate(tdiv_range):
         sol = shooting(sys, y0_guess, tdiv)
         y0_range[:, idx]  = sol.y0
         max_range[:, idx] = sol.max
+        min_range[:, idx] = sol.min
 
         # Basic continuation: the prediction of y0 for the next frequency
         # is simply the current solution.
@@ -141,7 +83,8 @@ def basic_continuation(sys: NLSystem, y0_guess, tdiv_range) -> ContinuationSolut
     return ContinuationSolution(
         tdiv_range = tdiv_range,
         y0_range   = y0_range,
-        max_range  = max_range
+        max_range  = max_range,
+        min_range  = min_range
     )
 
 
@@ -150,14 +93,16 @@ def secant_continuation(sys: NLSystem, y0_guess, tdiv_range) -> ContinuationSolu
 
     y0_range  = np.zeros((sys.ndof_ss, tdiv_range.size))
     max_range = np.zeros((sys.ndof,    tdiv_range.size))
+    min_range = np.zeros((sys.ndof,    tdiv_range.size))
 
     sol_pprev = shooting(sys, y0_guess, tdiv_range[0])
     y0_range[:, 0]  = y0_pprev = sol_pprev.y0
     max_range[:, 0] = sol_pprev.max
+    min_range[:, 0] = sol_pprev.min
 
     sol_prev = shooting(sys, y0_pprev, tdiv_range[0])
     y0_range[:, 1]  = y0_prev = sol_prev.y0
-    max_range[:, 1] = sol_prev.max
+    min_range[:, 1] = sol_prev.min
 
     for (shifted_idx, tdiv) in enumerate(tdiv_range[2:]):
         idx = shifted_idx + 2  # TODO: not elegant
@@ -170,6 +115,7 @@ def secant_continuation(sys: NLSystem, y0_guess, tdiv_range) -> ContinuationSolu
         sol = shooting(sys, y0_guess, tdiv)
         y0_range[:, idx]  = sol.y0
         max_range[:, idx] = sol.max
+        min_range[:, idx] = sol.min
 
         y0_pprev = y0_prev
         y0_prev  = sol.y0
@@ -177,5 +123,36 @@ def secant_continuation(sys: NLSystem, y0_guess, tdiv_range) -> ContinuationSolu
     return ContinuationSolution(
         tdiv_range = tdiv_range,
         y0_range   = y0_range,
-        max_range  = max_range
+        max_range  = max_range,
+        min_range  = min_range
     )
+
+
+def plot_BVP(sys, y0_guess, freq_Hz):
+    """Plot the BVP shooting solution."""
+
+    # Set the excitation frequency
+    tdiv = TimeDivision()
+    tdiv.f = freq_Hz
+
+    # Solve the BVP throught the shooting method
+    sol_shooting = shooting(sys, y0_guess, tdiv)
+    print(f"IC solution of the BVP: {sol_shooting.y0}")
+    print(f"DOF maximas: {sol_shooting.max}")
+    print(f"DOF minimas: {sol_shooting.min}")
+
+    # Verify that the BVP has been solved correctly
+    sol = solve_ivp(sys.integrand, [0, tdiv.T], sol_shooting.y0, args=(tdiv.w,), t_eval=np.linspace(0, tdiv.T, 300))
+    y = sol.y
+    t_sample = sol.t
+
+    fig, ax = plt.subplots(figsize=(5.5, 3.5), layout="constrained")
+    ax.plot(t_sample, y[:2, :].T)
+    ax.legend(['x1', 'x2'])
+    ax.set_xlabel('time (s)')
+    ax.set_ylabel('State vector')
+    ax.set_title(f"BVP solution (f = {sol_shooting.tdiv.f} Hz)")
+    ax.grid()
+    fig.show()
+
+    return sol_shooting
