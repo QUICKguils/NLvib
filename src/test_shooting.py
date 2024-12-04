@@ -11,38 +11,19 @@ from scipy.integrate import solve_ivp
 from utils.tdiv import TimeDivision
 import shooting
 
-# plt.rcParams['text.usetex'] = True
 plt.rcParams['mathtext.fontset'] = 'stix'
 plt.rcParams['font.family'] = 'serif'
 plt.rcParams['font.serif'] = ['STIX Two Text'] + plt.rcParams['font.serif']
-# plt.rcParams['figure.figsize'] = (6.34, 3.34)
-plt.rcParams['font.size'] = 11
-plt.rcParams['figure.dpi'] = 200
+plt.rcParams['font.size'] = 10
+plt.rcParams['figure.dpi'] = 150
 
 
-# def f_nl(x, x_dot):
-#     """Nonlinear force previously identified with RFS."""
-#     nl_coeffs = np.array([
-#         -2.09521445e+01,  1.36036473e+04,
-#         -6.60445565e-01, -3.30382563e+03,
-#         -9.68259415e-02, -1.15548181e+00,
-#          2.71928261e+00, -2.52949130e+00,
-#         -1.54618632e+05, -1.15104547e-03,
-#     ])
-#     f_assumed = np.array([
-#         [1,                0],
-#         [x[0],             0],
-#         [x_dot[0],         0],
-#         [x[0]**2,          0],
-#         [x_dot[0]**2,      0],
-#         [x[0]*x_dot[0],    0],
-#         [x[0]**2*x_dot[0], 0],
-#         [x[0]*x_dot[0]**2, 0],
-#         [x[0]**3,          0],
-#         [x_dot[0]**3,      0],
-#     ]).T
-#     return f_assumed @ nl_coeffs
+# TODO: make this cleaner. Not hardcode RFS values here
+def f_nl(x, x_dot):
+    """Nonlinear force, as identified by the RFS method."""
+    return np.array([3.6e5*x[0]**2 + 7.6e6*x[0]**3, 9E6*x[1]**5])
 
+# TODO: M, C, K shoud be global constants
 
 def build_undamped_free_system(f_nl):
     # Linear system matrices
@@ -88,22 +69,23 @@ def test_shooting(sys, y0_guess, freq_Hz):
 
     # Solve the BVP throught the shooting method
     sol_shooting = shooting.shooting(sys, y0_guess, tdiv)
-    print(sol_shooting.y0)
+    print(f"IC solution of the BVP: {sol_shooting.y0}")
+    print(f"DOF maximas: {sol_shooting.max}")
+    print(f"DOF minimas: {sol_shooting.min}")
 
     # Verify that the BVP has been solved correctly
-    y = solve_ivp(sys.integrand, [0, 2*tdiv.T], sol_shooting.y0, args=(tdiv.w,), dense_output=True).sol
-    t_sample = np.linspace(0, tdiv.T, 200)
-    plt.plot(t_sample, y(t_sample)[:2, :].T)
-    plt.legend(['x1', 'x2'])
-    # plt.plot(y(t_sample)[0, :].T, y(t_sample)[1, :].T)
-    # plt.plot(t_sample, y(t_sample).T)
-    # plt.legend(['x1', 'x2', 'x1_dot', 'x2_dot'])
-    plt.xlabel('time (s)')
-    plt.ylabel('State vector')
-    plt.title(f"BVP solution (f = {sol_shooting.tdiv.f} Hz)")
-    plt.grid()
-    plt.tight_layout()
-    plt.show()
+    sol = solve_ivp(sys.integrand, [0, tdiv.T], sol_shooting.y0, args=(tdiv.w,), t_eval=np.linspace(0, tdiv.T, 300))
+    y = sol.y
+    t_sample = sol.t
+
+    fig, ax = plt.subplots(figsize=(5.5, 3.5), layout="constrained")
+    ax.plot(t_sample, y[:2, :].T)
+    ax.legend(['x1', 'x2'])
+    ax.set_xlabel('time (s)')
+    ax.set_ylabel('State vector')
+    ax.set_title(f"BVP solution (f = {sol_shooting.tdiv.f} Hz)")
+    ax.grid()
+    fig.show()
 
     return sol_shooting
 
@@ -111,15 +93,20 @@ def test_shooting(sys, y0_guess, freq_Hz):
 def test_nfrc(sys, y0_guess, continuation=shooting.basic_continuation):
     """Compute NFRCs with sequential continuation."""
 
-    # NOTE::
-    # building a quick model of the linear system in NI2D show that the
-    # natural frequencies are about 16Hz and 27.6Hz.
+    # Manually refine near the peaks
     f_ranges = [
-        np.linspace(0.1,  17,   100),  # From 0Hz to the first natural frequency
-        np.linspace(17,   21,   300),  # Refine around the fundamental peak of the first freq
-        np.linspace(16.4, 27.4, 100),  # Restart from low amplitude, between the two fundamental peaks
-        np.linspace(27.4, 30,   100),  # Refine around the fundamental peak of the second freq
-        np.linspace(27.8, 35,   100),  # Restart from low amplitude, after the second fundamental peak
+        np.linspace(0.5,  5,     20),  # Segment 0
+        np.linspace(5,    5.5,   50),  # Segment 1
+        np.linspace(5.5,  7.5,   50),  # Segment 2
+        np.linspace(7.5,  8.5,   50),  # Segment 3
+        np.linspace(8.5,  10,    200), # Segment 4
+        np.linspace(10,   13.5,  50),  # Segment 5
+        np.linspace(13.5, 14.3,  400), # Segment 6
+        np.linspace(14.3, 18.9,  300), # Segment 7
+        np.linspace(20,   17,    200), # Segment 8
+        np.linspace(20,   29.3,  300), # Segment 9
+        np.linspace(30,   28.04, 100), # Segment 10
+        np.linspace(30,   40,    50),  # Segment 11
     ]
 
     # Build the associated time divisions
@@ -131,21 +118,28 @@ def test_nfrc(sys, y0_guess, continuation=shooting.basic_continuation):
 
     # Sequential continuation over the specified frequency range
     solutions = [0 for _ in f_ranges]
-    solutions[0] = continuation(sys, y0_guess,                     tdiv_ranges[0])
-    solutions[1] = continuation(sys, solutions[0].y0_range[:, -1], tdiv_ranges[1])
-    solutions[2] = continuation(sys, y0_guess,                     tdiv_ranges[2])
-    solutions[3] = continuation(sys, solutions[2].y0_range[:, -1], tdiv_ranges[3])
-    solutions[4] = continuation(sys, y0_guess,                     tdiv_ranges[4])
+    solutions[0]  = continuation(sys, y0_guess,                     tdiv_ranges[0])
+    solutions[1]  = continuation(sys, solutions[0].y0_range[:, -1], tdiv_ranges[1])
+    solutions[2]  = continuation(sys, solutions[1].y0_range[:, -1], tdiv_ranges[2])
+    solutions[3]  = continuation(sys, solutions[2].y0_range[:, -1], tdiv_ranges[3])
+    solutions[4]  = continuation(sys, solutions[3].y0_range[:, -1], tdiv_ranges[4])
+    solutions[5]  = continuation(sys, solutions[4].y0_range[:, -1], tdiv_ranges[5])
+    solutions[6]  = continuation(sys, solutions[5].y0_range[:, -1], tdiv_ranges[6])
+    solutions[7]  = continuation(sys, solutions[6].y0_range[:, -1], tdiv_ranges[7])
+    solutions[8]  = continuation(sys, y0_guess,                     tdiv_ranges[8])
+    solutions[9]  = continuation(sys, y0_guess,                     tdiv_ranges[9])
+    solutions[10] = continuation(sys, y0_guess,                     tdiv_ranges[10])
+    solutions[11] = continuation(sys, y0_guess,                     tdiv_ranges[11])
 
     # Plot the NFRC of DOF x1
+    fig, ax = plt.subplots(figsize=(5.5, 3.5), layout="constrained")
     for solution in solutions:
-        plt.plot([sol.f for sol in solution.tdiv_range], solution.max_range[0, :])
-    plt.xlabel('Excitation frequency (Hz)')
-    plt.ylabel('DOF amplitude (m)')
-    plt.title("Nonlinear frequency response curve")
-    plt.grid()
-    plt.tight_layout()
-    plt.show()
+        ax.plot([sol.f for sol in solution.tdiv_range], solution.max_range[0, :])
+    ax.set_xlabel('Excitation frequency (Hz)')
+    ax.set_ylabel('DOF amplitude (m)')
+    ax.set_title("NFRC")
+    ax.grid()
+    fig.show()
 
     return solutions
 
@@ -169,14 +163,14 @@ def test_nnm(sys, y0_guess, continuation=shooting.basic_continuation):
     solutions[0] = continuation(sys, y0_guess, tdiv_ranges[0])
 
     # Plot the natural freq amplitude of DOF x1
+    fig, ax = plt.subplots(figsize=(5.5, 3.5), layout="constrained")
     for solution in solutions:
-        plt.plot([sol.f for sol in solution.tdiv_range], solution.max_range[0, :])
-    plt.xlabel('Natural frequency (Hz)')
-    plt.ylabel('DOF amplitude (m)')
-    plt.title("Backbone of the NNMs")
-    plt.grid()
-    plt.tight_layout()
-    plt.show()
+        ax.plot([sol.f for sol in solution.tdiv_range], solution.max_range[0, :])
+    ax.set_xlabel('Natural frequency (Hz)')
+    ax.set_ylabel('DOF amplitude (m)')
+    ax.set_title("Backbone of the NNMs")
+    ax.grid()
+    fig.show()
 
     return solutions
 
@@ -184,14 +178,14 @@ def test_nnm(sys, y0_guess, continuation=shooting.basic_continuation):
 if __name__ == '__main__':
     # Set simulation parameters
     f_ext_ampl = 50
-    f_ext_freq = 15.915
+    f_ext_freq = 13.9851
     y0_guess = 1E-2 * np.array([1, 1, 0, 0])
-    f_nl = lambda x, x_dot: np.array([-1E4*x[0]**3, 0])
+    # f_nl = lambda x, x_dot: np.array([-2E4*x[0]**3, 0])
 
     # Test the code
-    sys_free = build_undamped_free_system(f_nl)
-    shooting_sol_free = test_shooting(sys_free, y0_guess, f_ext_freq)
+    # sys_free = build_undamped_free_system(f_nl)
+    # shooting_sol_free = test_shooting(sys_free, y0_guess, f_ext_freq)
     sys_forced = build_damped_forced_system(f_nl, f_ext_ampl)
-    shooting_sol_forced = test_shooting(sys_forced, y0_guess, f_ext_freq)
-    # nfrc_sol = test_nfrc(sys_forced, y0_guess)
+    # shooting_sol_forced = test_shooting(sys_forced, y0_guess, f_ext_freq)
+    nfrc_sol = test_nfrc(sys_forced, y0_guess)
     # nnm_sol = test_nnm(sys_free, y0_guess)

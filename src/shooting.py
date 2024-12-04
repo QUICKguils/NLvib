@@ -1,4 +1,4 @@
-"""shooting -- Collection of nonlinear solvers based on the shooting method."""
+"""Collection of nonlinear solvers based on the shooting method."""
 
 # TODO:
 # - think of a better handling of forces arguments
@@ -80,10 +80,12 @@ class ShootingSolution(NamedTuple):
     """Solution of a BVP via the shooting method.
     y0  -- IC solution of the BVP, for the desired tdiv.
     max -- Corresponding DOFs maximum displacement.
+    min -- Corresponding DOFs maximum displacement.
     """
     tdiv: TimeDivision
     y0:   np.ndarray
     max:  np.ndarray
+    min:  np.ndarray
 
 
 def shooting(sys: NLSystem, y0_guess, tdiv: TimeDivision) -> ShootingSolution:
@@ -96,15 +98,19 @@ def shooting(sys: NLSystem, y0_guess, tdiv: TimeDivision) -> ShootingSolution:
         return (yT - y0)
 
     sol = root(objective, y0_guess)
-    print("shooting success: ", sol.success)
+    print(f"shooting success: {sol.success}, nfev: {sol.nfev}, freq: {tdiv.f}Hz")
     y0 = sol.x
 
-    y = solve_ivp(sys.integrand, [0, tdiv.T], y0, args=(tdiv.w,), dense_output=True).sol
-    min_dof1 = minimize_scalar(lambda t: y(t)[0], bounds=(0, tdiv.T))
-    min_dof2 = minimize_scalar(lambda t: y(t)[1], bounds=(0, tdiv.T))
-    max = [-min_dof1.fun, -min_dof2.fun]
+    # Find the extremum displacements of each DOFs
+    y = solve_ivp(sys.integrand, [0, tdiv.T], y0, args=(tdiv.w,), t_eval=np.linspace(0, tdiv.T, 300)).y
+    max_dof1 = np.max(y[0, :])
+    max_dof2 = np.max(y[1, :])
+    max = [max_dof1, max_dof2]
+    min_dof1 = np.min(y[0, :])
+    min_dof2 = np.min(y[1, :])
+    min = [min_dof1, min_dof2]
 
-    return ShootingSolution(tdiv=tdiv, y0=y0, max=max)
+    return ShootingSolution(tdiv=tdiv, y0=y0, max=max, min=min)
 
 
 class ContinuationSolution(NamedTuple):
