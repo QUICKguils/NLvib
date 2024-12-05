@@ -128,21 +128,17 @@ def secant_continuation(sys: NLSystem, y0_guess, tdiv_range) -> ContinuationSolu
     )
 
 
-def plot_BVP(sys, y0_guess, freq_Hz):
+def plot_BVP(sys: NLSystem, y0_guess, bspan: TimeDivision):
     """Plot the BVP shooting solution."""
 
-    # Set the excitation frequency
-    tdiv = TimeDivision()
-    tdiv.f = freq_Hz
-
     # Solve the BVP throught the shooting method
-    sol_shooting = shooting(sys, y0_guess, tdiv)
+    sol_shooting = shooting(sys, y0_guess, bspan)
     print(f"IC solution of the BVP: {sol_shooting.y0}")
     print(f"DOF maximas: {sol_shooting.max}")
     print(f"DOF minimas: {sol_shooting.min}")
 
     # Verify that the BVP has been solved correctly
-    sol = solve_ivp(sys.integrand, [0, tdiv.T], sol_shooting.y0, args=(tdiv.w,), t_eval=np.linspace(0, tdiv.T, 300))
+    sol = solve_ivp(sys.integrand, [0, bspan.T], sol_shooting.y0, args=(bspan.w,), t_eval=np.linspace(0, bspan.T, 300))
     y = sol.y
     t_sample = sol.t
 

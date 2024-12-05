@@ -1,10 +1,10 @@
+"""Computation of the nonlinear frequency response curves (NFRCs)."""
+
 # TODO:
 # - must have an init method for TimeDivision, otherwise it is painful to set
 #   an array of TimeDivision (see the test_basic_continuation function).
 #   Maybe one can inspire from the aeroE code:
 #   fft_signals = np.zeros(extracted_signals.shape[:2], dtype=ld.ExtractedSignal)
-
-"""Computation of the nonlinear frequency response curves (NFRCs)."""
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,7 +13,7 @@ import nlsys
 import shooting
 
 
-def test_nfrc(sys, y0_guess, continuation=shooting.basic_continuation):
+def compute_nfrc(sys, y0_guess, continuation=shooting.basic_continuation):
     """Compute NFRCs with sequential continuation."""
 
     # Manually refine near the peaks
@@ -70,15 +70,16 @@ def plot_nfrc(sol_nfrc) -> None:
 
 
 if __name__ == '__main__':
-    # Set simulation parameters
-    f_ext_ampl = 50
-    f_ext_freq = 15
-    y0_guess = 1E-2 * np.array([1, 1, 0, 0])
-
-
-    # Forced, damped system
+    # Build the nonlinear forced system
+    f_ext_ampl = 50  # Excitation force amplitude (N)
     sys_forced = nlsys.build_damped_forced_system(nlsys.f_nl, f_ext_ampl)
-    shooting_sol_forced = shooting.plot_BVP(sys_forced, y0_guess, f_ext_freq)
-    sol_nfrc = test_nfrc(sys_forced, y0_guess)
+
+    # Compute the NFRC
+    y0_guess = 1E-2 * np.array([1, 1, 0, 0])  # Default IC guess
+    sol_nfrc = compute_nfrc(sys_forced, y0_guess)
     plot_nfrc(sol_nfrc)
 
+    # Verify one of the system response, at a given excitation frequency
+    f_ext_tdiv = nlsys.TimeDivision()
+    f_ext_tdiv.f = 15
+    shooting_sol_forced = shooting.plot_BVP(sys_forced, y0_guess, f_ext_tdiv)

@@ -41,7 +41,9 @@ class NLSystem:
         M*x_ddot(t) + C*x_dot(t) + K*x(t) + f_nl(x, x_dot) = f_ext(w, t)
         """
         # WARN: only add to node 1
-        self.f_ext = lambda w, t: np.array([amplitude*np.sin(w*t), 0])
+        def f_ext(w, t):
+            return np.array([amplitude*np.sin(w*t), 0])
+        self.f_ext = f_ext
 
     def build_undamped_free_state_space(self):
         """Recast in first order state-space form:
@@ -54,9 +56,13 @@ class NLSystem:
         self.ndof_ss = 2*self.ndof
 
         self.L = np.vstack((np.hstack((null, identity)), np.hstack((-M_inv@self.K, null))))
-        self.g_nl = lambda y: np.concatenate((np.zeros(self.ndof), M_inv@self.f_nl(y[:len(y)//2], y[len(y)//2:])))
+        def g_nl(y):
+            return np.concatenate((np.zeros(self.ndof), M_inv@self.f_nl(y[:len(y)//2], y[len(y)//2:])))
+        self.g_nl = g_nl
 
-        self.integrand = lambda t, y, w: self.L@y - self.g_nl(y)
+        def integrand(t, y, w):
+            return self.L@y - self.g_nl(y)
+        self.integrand = integrand
 
     def build_damped_forced_state_space(self):
         """Recast in first order state-space form:
@@ -69,10 +75,16 @@ class NLSystem:
         self.ndof_ss = 2*self.ndof
 
         self.L = np.vstack((np.hstack((null, identity)), np.hstack((-M_inv@self.K, -M_inv@self.C))))
-        self.g_nl  = lambda y:    np.concatenate((np.zeros(self.ndof), M_inv@self.f_nl(y[:len(y)//2], y[len(y)//2:])))
-        self.g_ext = lambda w, t: np.concatenate((np.zeros(self.ndof), M_inv@self.f_ext(w, t)))
+        def g_nl(y):
+            return np.concatenate((np.zeros(self.ndof), M_inv@self.f_nl(y[:len(y)//2], y[len(y)//2:])))
+        self.g_nl = g_nl
+        def g_ext(w, t):
+            return np.concatenate((np.zeros(self.ndof), M_inv@self.f_ext(w, t)))
+        self.g_ext = g_ext
 
-        self.integrand = lambda t, y, w: self.L@y - self.g_nl(y) + self.g_ext(w, t)
+        def integrand(t, y, w):
+            return self.L@y - self.g_nl(y) + self.g_ext(w, t)
+        self.integrand = integrand
 
 
 def build_undamped_free_system(f_nl):
