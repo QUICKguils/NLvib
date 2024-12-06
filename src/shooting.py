@@ -36,7 +36,7 @@ def shooting(sys: NLSystem, y0_guess, tdiv: TimeDivision) -> ShootingSolution:
         return (yT - y0)
 
     sol = root(objective, y0_guess)
-    print(f"shooting success: {sol.success}, nfev: {sol.nfev}, freq: {tdiv.f}Hz")
+    print(f"shooting success: {sol.success}, nfev: {sol.nfev}, freq: {tdiv.f:.4f}Hz")
     y0 = sol.x
 
     # Find the extremum displacements of each DOFs
