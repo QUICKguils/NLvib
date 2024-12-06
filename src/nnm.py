@@ -23,7 +23,7 @@ def compute_nnm(sys, continuation=shooting.basic_continuation):
 
     f_ranges = [
         np.linspace(15.94, 18.9, 500),  # 1st linear freq: 15.915Hz
-        np.linspace(27.6,  29.4, 500),  # 2nd linear freq: 27.566Hz
+        np.linspace(27.52, 29.4, 500),  # 2nd linear freq: 27.566Hz
     ]
 
     # Build the associated time divisions
