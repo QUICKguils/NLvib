@@ -136,7 +136,7 @@ def mthread_attractor(
 
 def compute_attractor(
         sys: nlsys.NLSystem, f_ext_tdiv: nlsys.TimeDivision,
-        bounds=[-0.2, 0.2, -0.2, 0.2], n_grid=30, mult=200, solve=simple_attractor):
+        bounds=[-0.2, 0.2, -0.2, 0.2], n_grid=20, mult=200, solve=simple_attractor):
     """Wrapper function to choose the solving method and set the solving parameters."""
 
     # Assumed steady-state time span.
@@ -191,22 +191,22 @@ if __name__ == '__main__':
     # Excitation frequency where bifurcation occurs
     f_ext_tdiv = nlsys.TimeDivision()
     f_ext_tdiv.f = 18  # mode 1
-    # f_ext_tdiv.f = 28.7  # mode 2
+    # f_ext_tdiv.f = 28.4  # mode 2
 
     # Compute the basins of attraction
     sol_attractor = compute_attractor(
         sys_forced, f_ext_tdiv, bounds,
-        n_grid=10,
+        n_grid=50,
         solve=mproc_attractor
     )
     plot_attractor(sol_attractor, n_dof=0)
     plot_attractor(sol_attractor, n_dof=1)
 
     # Maybe think to save them
-    if True:
+    if False:
         ROOT_DIR = pathlib.Path(__file__).parent.parent
         OUT_DIR = ROOT_DIR / "out"
         fpath_dof1 = OUT_DIR / "ss_max_dof1.txt"
         fpath_dof2 = OUT_DIR / "ss_max_dof2.txt"
-        np.savetxt(fpath_dof1, sol_attractor.ss_ampl[0])
-        np.savetxt(fpath_dof2, sol_attractor.ss_ampl[1])
+        np.savetxt(fpath_dof1, sol_attractor.ss_ampl[0])  # displ dof1
+        np.savetxt(fpath_dof2, sol_attractor.ss_ampl[2])  # speed dof1
