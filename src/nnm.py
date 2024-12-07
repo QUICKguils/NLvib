@@ -17,13 +17,20 @@ def compute_nnm(sys, continuation=shooting.basic_continuation):
     """Compute NNMs and backbones with sequential continuation."""
 
     y0_guesses = [
-        1E-3 * np.array([-7.435, -6.906, 0, 0]),
-        1E-2 * np.array([-7.435,  6.906, 0, 0]),
+        1E-2 * np.array([1.3,  1.1, 0, 0]),
+        1E-3 * np.array([-7,   7,   0, 0]),
+        1E-2 * np.array([-3.1, 2.2, 0, 0]),
     ]
 
     f_ranges = [
-        np.linspace(15.94, 18.9, 500),  # 1st linear freq: 15.915Hz
-        np.linspace(27.52, 29.4, 500),  # 2nd linear freq: 27.566Hz
+        # First backbone (1st linear freq: 15.915Hz)
+        np.linspace(16, 15.92, 100),  # hardening
+        np.linspace(16, 19,    300),  # hardening
+
+        # Second backbone (2nd linear freq: 27.566Hz)
+        np.linspace(27.55, 27.52, 100),  # slight softening
+        np.linspace(27.7,  27.52, 100),  # hardening
+        np.linspace(27.7, 30,    300),   # hardening
     ]
 
     # Build the associated time divisions
@@ -36,7 +43,10 @@ def compute_nnm(sys, continuation=shooting.basic_continuation):
     # Sequential continuation over the specified frequency range
     sol_nnm = [0 for _ in f_ranges]
     sol_nnm[0] = continuation(sys, y0_guesses[0], tdiv_ranges[0])
-    sol_nnm[1] = continuation(sys, y0_guesses[1], tdiv_ranges[1])
+    sol_nnm[1] = continuation(sys, y0_guesses[0], tdiv_ranges[1])
+    sol_nnm[2] = continuation(sys, y0_guesses[1], tdiv_ranges[2])
+    sol_nnm[3] = continuation(sys, y0_guesses[2], tdiv_ranges[3])
+    sol_nnm[4] = continuation(sys, y0_guesses[2], tdiv_ranges[4])
 
     return sol_nnm
 
@@ -61,9 +71,9 @@ if __name__ == '__main__':
     sol_nnm = compute_nnm(sys_free)
     plot_backbone(sol_nnm)
 
-    # Verify one of the system response, at the given
-    # system time division (natural frequency)
-    sys_tdiv = nlsys.TimeDivision()
-    sys_tdiv.f = 15.94
-    y0_guess = 1E-3 * np.array([-7.435, -6.906, 0, 0])
-    shooting_sol_free = shooting.plot_BVP(sys_free, y0_guess, sys_tdiv)
+    # # Verify one of the system response, at the given
+    # # system time division (natural frequency)
+    # sys_tdiv = nlsys.TimeDivision()
+    # sys_tdiv.f = 15.94
+    # y0_guess = 1E-3 * np.array([-7.435, -6.906, 0, 0])
+    # shooting_sol_free = shooting.plot_BVP(sys_free, y0_guess, sys_tdiv)

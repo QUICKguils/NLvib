@@ -71,56 +71,72 @@ def plot_nfrc_envelope(sol_nfrc, x, t, freq_start, freq_end) -> None:
     fig.show()
 
 
-def plot_nnm(sys_free: nlsys.NLSystem, sol_nnm, id_mode=0) -> None:
-    sol_bb = sol_nnm[id_mode]
-    y0_low = sol_bb.y0_range[:, 0]
-    y0_high = sol_bb.y0_range[:, -1]
-    tdiv_low = sol_bb.tdiv_range[0]
-    tdiv_high = sol_bb.tdiv_range[-1]
+def compute_nnm_bounds(sys_free: nlsys.NLSystem, sol_nnm, id_mode=0):
+    # TODO: not robust: break each time the elements order of sol_nnm are modified
+    if id_mode == 0:
+        y0_lf = sol_nnm[0].y0_range[:, -1]
+        y0_hf = sol_nnm[1].y0_range[:, -1]
+        tdiv_lf = sol_nnm[0].tdiv_range[-1]
+        tdiv_hf = sol_nnm[1].tdiv_range[-1]
+    if id_mode == 1:
+        y0_lf = sol_nnm[2].y0_range[:, 0]
+        y0_hf = sol_nnm[4].y0_range[:, -1]
+        tdiv_lf = sol_nnm[2].tdiv_range[0]
+        tdiv_hf = sol_nnm[4].tdiv_range[-1]
 
-    sol_low = solve_ivp(
+    nnm_lf = solve_ivp(
         sys_free.integrand,
-        [0, tdiv_low.T],
-        y0_low,
-        args=(tdiv_low.w,),
-        t_eval=np.linspace(0, tdiv_low.T, 300))
-    sol_high = solve_ivp(
+        [0, tdiv_lf.T],
+        y0_lf,
+        args=(tdiv_lf.w,),
+        t_eval=np.linspace(0, tdiv_lf.T, 300))
+    nnm_hf = solve_ivp(
         sys_free.integrand,
-        [0, tdiv_high.T],
-        y0_high,
-        args=(tdiv_high.w,),
-        t_eval=np.linspace(0, tdiv_high.T, 300))
+        [0, tdiv_hf.T],
+        y0_hf,
+        args=(tdiv_hf.w,),
+        t_eval=np.linspace(0, tdiv_hf.T, 300))
 
-    fig, (ax_low, ax_high) = plt.subplots(1, 2)
+    return nnm_lf, nnm_hf, tdiv_lf, tdiv_hf
 
-    ax_low.plot(sol_low.y[0, :], sol_low.y[1, :], color='C0', linewidth=0.6)
-    ax_low.set_xlabel(r"$x_1$ [m]")
-    ax_low.set_ylabel(r"$x_2$ [m]")
-    ax_low.ticklabel_format(axis='both', style='sci', scilimits=(0,0))
-    ax_low.grid(True, linewidth=0.5, alpha=0.3)
 
-    ax_high.plot(sol_high.y[0, :], sol_high.y[1, :], color='C0', linewidth=0.6)
-    ax_high.set_xlabel(r"$x_1$ [m]")
-    ax_high.set_ylabel(r"$x_2$ [m]")
-    ax_high.ticklabel_format(axis='both', style='sci', scilimits=(0,0))
-    ax_high.grid(True, linewidth=0.5, alpha=0.3)
+def plot_nnm_periodic_sol(nnm_lf, nnm_hf, tdiv_lf, tdiv_hf) -> None:
+    fig, (ax_lf, ax_hf) = plt.subplots(1, 2)
+
+    ax_lf.plot(nnm_lf.t, nnm_lf.y[:2, :].T, linewidth=0.6)
+    ax_lf.set_title(f"{tdiv_lf.f:.2f} Hz")
+    ax_lf.set_xlabel(r"Time [s]")
+    ax_lf.set_ylabel(r"$x_1, x_2$ [m]")
+    ax_lf.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+    ax_lf.grid(True, linewidth=0.5, alpha=0.3)
+
+    ax_hf.plot(nnm_hf.t, nnm_hf.y[:2, :].T, linewidth=0.6)
+    ax_hf.set_title(f"{tdiv_hf.f:.2f} Hz")
+    ax_hf.set_xlabel(r"Time [s]")
+    ax_hf.set_ylabel(r"$x_1, x_2$ [m]")
+    ax_hf.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+    ax_hf.grid(True, linewidth=0.5, alpha=0.3)
 
     fig.tight_layout()
     fig.show()
 
-    fig, (ax_low, ax_high) = plt.subplots(1, 2)
 
-    ax_low.plot(sol_low.t, sol_low.y[:2, :].T, linewidth=0.6)
-    ax_low.set_xlabel(r"Time [s]")
-    ax_low.set_ylabel(r"$x_1, x_2$ [m]")
-    ax_low.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
-    ax_low.grid(True, linewidth=0.5, alpha=0.3)
+def plot_nnm_config_space(nnm_lf, nnm_hf, tdiv_lf, tdiv_hf) -> None:
+    fig, (ax_lf, ax_hf) = plt.subplots(1, 2)
 
-    ax_high.plot(sol_high.t, sol_high.y[:2, :].T, linewidth=0.6)
-    ax_high.set_xlabel(r"Time [s]")
-    ax_high.set_ylabel(r"$x_1, x_2$ [m]")
-    ax_high.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
-    ax_high.grid(True, linewidth=0.5, alpha=0.3)
+    ax_lf.plot(nnm_lf.y[0, :], nnm_lf.y[1, :], color='C0', linewidth=0.6)
+    ax_lf.set_title(f"{tdiv_lf.f:.2f} Hz")
+    ax_lf.set_xlabel(r"$x_1$ [m]")
+    ax_lf.set_ylabel(r"$x_2$ [m]")
+    ax_lf.ticklabel_format(axis='both', style='sci', scilimits=(0,0))
+    ax_lf.grid(True, linewidth=0.5, alpha=0.3)
+
+    ax_hf.plot(nnm_hf.y[0, :], nnm_hf.y[1, :], color='C0', linewidth=0.6)
+    ax_hf.set_title(f"{tdiv_hf.f:.2f} Hz")
+    ax_hf.set_xlabel(r"$x_1$ [m]")
+    ax_hf.set_ylabel(r"$x_2$ [m]")
+    ax_hf.ticklabel_format(axis='both', style='sci', scilimits=(0,0))
+    ax_hf.grid(True, linewidth=0.5, alpha=0.3)
 
     fig.tight_layout()
     fig.show()
@@ -130,10 +146,11 @@ if __name__ == '__main__':
 
     mplrc.load_rcparams()
 
-    sys_free, sol_nfrc, sol_nnm = compute_nfrc_backbone()
-    sim_data = extract_simulation_data("group4_test3_2.mat")
+    # sys_free, sol_nfrc, sol_nnm = compute_nfrc_backbone()
+    # sim_data = extract_simulation_data("group4_test3_2.mat")
+    # nnm_fbounds = compute_nnm_bounds(sys_free, sol_nnm, id_mode=0)
 
-    plot_nfrc_backbone(sol_nfrc, sol_nnm)
-    plot_nfrc_envelope(sol_nfrc, *sim_data)
-    plot_nnm(sys_free, sol_nnm, id_mode=0)
-    plot_nnm(sys_free, sol_nnm, id_mode=1)
+    # plot_nfrc_backbone(sol_nfrc, sol_nnm)
+    # plot_nfrc_envelope(sol_nfrc, *sim_data)
+    # plot_nnm_periodic_sol(*nnm_fbounds)
+    # plot_nnm_config_space(*nnm_fbounds)
