@@ -146,11 +146,11 @@ if __name__ == '__main__':
 
     mplrc.load_rcparams()
 
-    # sys_free, sol_nfrc, sol_nnm = compute_nfrc_backbone()
-    # sim_data = extract_simulation_data("group4_test3_2.mat")
-    # nnm_fbounds = compute_nnm_bounds(sys_free, sol_nnm, id_mode=0)
+    sys_free, sol_nfrc, sol_nnm = compute_nfrc_backbone()
+    sim_data = extract_simulation_data("group4_test3_2.mat")
+    nnm_fbounds = compute_nnm_bounds(sys_free, sol_nnm, id_mode=0)
 
-    # plot_nfrc_backbone(sol_nfrc, sol_nnm)
-    # plot_nfrc_envelope(sol_nfrc, *sim_data)
-    # plot_nnm_periodic_sol(*nnm_fbounds)
-    # plot_nnm_config_space(*nnm_fbounds)
+    plot_nfrc_backbone(sol_nfrc, sol_nnm)
+    plot_nfrc_envelope(sol_nfrc, *sim_data)
+    plot_nnm_periodic_sol(*nnm_fbounds)
+    plot_nnm_config_space(*nnm_fbounds)

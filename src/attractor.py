@@ -16,7 +16,7 @@ import nlsys
 
 def compute_ss_amplitude(sys: nlsys.NLSystem, y0, f_ext_tdiv: nlsys.TimeDivision, ivp_span, t_eval):
     """Steady-state amplitude of the system response, for the given ICs."""
-    y = solve_ivp(sys.integrand, ivp_span, y0, args=(f_ext_tdiv.w,), t_eval=t_eval).y
+    y = solve_ivp(sys.integrand, ivp_span, y0, args=(f_ext_tdiv.w,), t_eval=t_eval, method='RK23').y
 
     max_dof1 = np.max(y[0,:])
     max_dof2 = np.max(y[1,:])
@@ -139,7 +139,7 @@ def compute_attractor(
         bounds=[-0.2, 0.2, -0.2, 0.2], n_grid=20, mult=200, solve=simple_attractor):
     """Wrapper function to choose the solving method and set the solving parameters."""
 
-    # Assumed steady-state time span.
+    # Assumed integration and steady-state time spans.
     # Heuristically chosen to be a certain multiple of the excitation force period.
     ivp_span = mult * f_ext_tdiv.T * np.array([0, 1])
     ss_span  = mult * f_ext_tdiv.T * np.array([2/3, 1])
@@ -180,23 +180,26 @@ def _plot_time_response(sys: nlsys.NLSystem, y0, f_ext_tdiv: nlsys.TimeDivision)
 
 
 if __name__ == '__main__':
+    pass
+
     # Build the nonlinear forced system
     f_ext_ampl = 50  # Excitation force amplitude (N)
     sys_forced = nlsys.build_damped_forced_system(nlsys.f_nl, f_ext_ampl)
 
     # Range of DOF1 and DOF2 initial displacements
-    bounds = [-0.2, 0.2, -0.2, 0.2] # mode 1
-    # bounds = [-0.2, 0.2, -0.2, 0.2] # mode 2
+    # bounds = [-0.2, 0.2, -0.2, 0.2] # mode 1
+    bounds = [-0.2, 0.2, -0.2, 0.2] # mode 2
 
     # Excitation frequency where bifurcation occurs
     f_ext_tdiv = nlsys.TimeDivision()
-    f_ext_tdiv.f = 18  # mode 1
-    # f_ext_tdiv.f = 28.4  # mode 2
+    # f_ext_tdiv.f = 18  # mode 1
+    f_ext_tdiv.f = 28.4  # mode 2
 
     # Compute the basins of attraction
     sol_attractor = compute_attractor(
         sys_forced, f_ext_tdiv, bounds,
-        n_grid=50,
+        mult=600,
+        n_grid=20,
         solve=mproc_attractor
     )
     plot_attractor(sol_attractor, n_dof=0)
