@@ -40,7 +40,12 @@ def shooting(sys: NLSystem, y0_guess, tdiv: TimeDivision) -> ShootingSolution:
     y0 = sol.x
 
     # Find the extremum displacements of each DOFs
-    y = solve_ivp(sys.integrand, [0, tdiv.T], y0, args=(tdiv.w,), t_eval=np.linspace(0, tdiv.T, 300)).y
+    y = solve_ivp(
+        sys.integrand,
+        [0, tdiv.T],
+        y0,
+        args=(tdiv.w,),
+        t_eval=np.linspace(0, tdiv.T, 300)).y
     max_dof1 = np.max(y[0, :])
     max_dof2 = np.max(y[1, :])
     max = [max_dof1, max_dof2]
@@ -138,7 +143,12 @@ def plot_BVP(sys: NLSystem, y0_guess, bspan: TimeDivision):
     print(f"DOF minimas: {sol_shooting.min}")
 
     # Verify that the BVP has been solved correctly
-    sol = solve_ivp(sys.integrand, [0, bspan.T], sol_shooting.y0, args=(bspan.w,), t_eval=np.linspace(0, bspan.T, 300))
+    sol = solve_ivp(
+        sys.integrand,
+        [0, bspan.T],
+        sol_shooting.y0,
+        args=(bspan.w,),
+        t_eval=np.linspace(0, bspan.T, 300))
     y = sol.y
     t_sample = sol.t
 

@@ -53,10 +53,6 @@ def plot_backbone(sol_nnm) -> None:
     fig.show()
 
 
-def plot_nnm(sol_nnm) -> None:
-    pass
-
-
 if __name__ == '__main__':
     # Build the nonlinear free system
     sys_free = nlsys.build_undamped_free_system(nlsys.f_nl)
