@@ -142,15 +142,42 @@ def plot_nnm_config_space(nnm_lf, nnm_hf, tdiv_lf, tdiv_hf) -> None:
     fig.show()
 
 
+def plot_attractor_2() -> None:
+    ROOT_DIR = pathlib.Path(__file__).parent.parent
+    OUT_DIR = ROOT_DIR / "out"
+    AT = np.loadtxt(str(OUT_DIR / "above_left_max_dof1.txt"))
+    BT = np.flip(np.loadtxt(str(OUT_DIR / "above_right_max_dof1.txt")), 1)
+    CT = np.flip(np.loadtxt(str(OUT_DIR / "below_left_max_dof1.txt")), 1)
+    DT = np.loadtxt(str(OUT_DIR / "below_right_max_dof1.txt"))
+
+    ss_ampl = np.vstack((np.hstack((AT, CT)), np.hstack((BT, DT)))).T
+
+    fig, ax = plt.subplots()
+    ax.set_aspect('equal', adjustable='box')
+
+    dof_sample = np.linspace(-0.2, 0.2, 200)
+    dof1_mat, dof2_mat = np.meshgrid(dof_sample, dof_sample)
+
+    ax.pcolormesh(dof1_mat, dof2_mat, ss_ampl, cmap='bwr')
+
+    ax.set_xlabel(r'Initial displacement $x_{1}(0)$ [m]')
+    ax.set_ylabel(r'Initial displacement $x_{2}(0)$ [m]')
+
+    fig.tight_layout()
+    fig.show()
+
+
 if __name__ == '__main__':
 
     mplrc.load_rcparams()
 
-    sys_free, sol_nfrc, sol_nnm = compute_nfrc_backbone()
-    sim_data = extract_simulation_data("group4_test3_2.mat")
-    nnm_fbounds = compute_nnm_bounds(sys_free, sol_nnm, id_mode=0)
+    # sys_free, sol_nfrc, sol_nnm = compute_nfrc_backbone()
+    # sim_data = extract_simulation_data("group4_test3_2.mat")
+    # nnm_fbounds = compute_nnm_bounds(sys_free, sol_nnm, id_mode=0)
 
-    plot_nfrc_backbone(sol_nfrc, sol_nnm)
-    plot_nfrc_envelope(sol_nfrc, *sim_data)
-    plot_nnm_periodic_sol(*nnm_fbounds)
-    plot_nnm_config_space(*nnm_fbounds)
+    # plot_nfrc_backbone(sol_nfrc, sol_nnm)
+    # plot_nfrc_envelope(sol_nfrc, *sim_data)
+    # plot_nnm_periodic_sol(*nnm_fbounds)
+    # plot_nnm_config_space(*nnm_fbounds)
+
+    plot_attractor_2()

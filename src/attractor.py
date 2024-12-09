@@ -16,7 +16,8 @@ import nlsys
 
 def compute_ss_amplitude(sys: nlsys.NLSystem, y0, f_ext_tdiv: nlsys.TimeDivision, ivp_span, t_eval):
     """Steady-state amplitude of the system response, for the given ICs."""
-    y = solve_ivp(sys.integrand, ivp_span, y0, args=(f_ext_tdiv.w,), t_eval=t_eval, method='RK23').y
+    y = solve_ivp(sys.integrand, ivp_span, y0, args=(f_ext_tdiv.w,), t_eval=t_eval).y
+    # y = solve_ivp(sys.integrand, ivp_span, y0, args=(f_ext_tdiv.w,), t_eval=t_eval, method='RK23').y
 
     max_dof1 = np.max(y[0,:])
     max_dof2 = np.max(y[1,:])
@@ -52,7 +53,7 @@ def simple_attractor(
     return AttractorSolution(ss_ampl=ss_ampl, dof1=dof1, dof2=dof2, n_grid=n_grid)
 
 
-# WARN: multiprocessing is wonky.
+# WARN:
 # Apparently, it will require a deep refactor of the code to make this works
 # with the standary python multiprocessing library.
 # For example, one issue is that function attributes like f_ext in the
@@ -78,8 +79,8 @@ def mproc_attractor(
         results = pool.starmap(partial_compute, points)
 
     result_idx = 0
-    for id1, d1 in enumerate(dof1):
-        for id2, d2 in enumerate(dof2):
+    for id1, _ in enumerate(dof1):
+        for id2, _ in enumerate(dof2):
             ss_ampl[:, id1, id2] = results[result_idx]
             result_idx += 1
 
@@ -157,7 +158,7 @@ def plot_attractor(sol: AttractorSolution, n_dof=0) -> None:
 
     dof1_mat, dof2_mat = np.meshgrid(sol.dof1, sol.dof2)
 
-    ax.pcolormesh(dof1_mat, dof2_mat, sol.ss_ampl[n_dof], cmap='bwr')
+    ax.pcolormesh(dof1_mat, dof2_mat, sol.ss_ampl[n_dof].T, cmap='bwr')
 
     ax.set_xlabel(r'Initial displacement $x_{1}(0)$ [m]')
     ax.set_ylabel(r'Initial displacement $x_{2}(0)$ [m]')
@@ -165,7 +166,7 @@ def plot_attractor(sol: AttractorSolution, n_dof=0) -> None:
     fig.show()
 
 
-def _plot_time_response(sys: nlsys.NLSystem, y0, f_ext_tdiv: nlsys.TimeDivision) -> None:
+def _plot_time_response(sys_forced: nlsys.NLSystem, y0, f_ext_tdiv: nlsys.TimeDivision) -> None:
     """Check the time response of the system, for the given ICs and excitation frequency."""
 
     mult = 300
@@ -187,20 +188,20 @@ if __name__ == '__main__':
     sys_forced = nlsys.build_damped_forced_system(nlsys.f_nl, f_ext_ampl)
 
     # Range of DOF1 and DOF2 initial displacements
-    # bounds = [-0.2, 0.2, -0.2, 0.2] # mode 1
-    bounds = [-0.2, 0.2, -0.2, 0.2] # mode 2
+    bounds = [-0.2, 0.2, -0.2, 0.2] # mode 1
+    # bounds = [0, 0.2, 0, -0.2] # mode 2
 
     # Excitation frequency where bifurcation occurs
     f_ext_tdiv = nlsys.TimeDivision()
-    # f_ext_tdiv.f = 18  # mode 1
-    f_ext_tdiv.f = 28.4  # mode 2
+    f_ext_tdiv.f = 18  # mode 1
+    # f_ext_tdiv.f = 28.4  # mode 2
 
     # Compute the basins of attraction
     sol_attractor = compute_attractor(
         sys_forced, f_ext_tdiv, bounds,
-        mult=600,
-        n_grid=20,
-        solve=mproc_attractor
+        # mult=600,
+        # n_grid=100,
+        # solve=mproc_attractor
     )
     plot_attractor(sol_attractor, n_dof=0)
     plot_attractor(sol_attractor, n_dof=1)
@@ -209,7 +210,11 @@ if __name__ == '__main__':
     if False:
         ROOT_DIR = pathlib.Path(__file__).parent.parent
         OUT_DIR = ROOT_DIR / "out"
-        fpath_dof1 = OUT_DIR / "ss_max_dof1.txt"
-        fpath_dof2 = OUT_DIR / "ss_max_dof2.txt"
-        np.savetxt(fpath_dof1, sol_attractor.ss_ampl[0])  # displ dof1
-        np.savetxt(fpath_dof2, sol_attractor.ss_ampl[2])  # speed dof1
+        fpath_max1 = OUT_DIR / "draft1.txt"
+        fpath_max2 = OUT_DIR / "draft2.txt"
+        fpath_min1 = OUT_DIR / "draft3.txt"
+        fpath_min2 = OUT_DIR / "draft4.txt"
+        np.savetxt(fpath_max1, sol_attractor.ss_ampl[0])
+        np.savetxt(fpath_max2, sol_attractor.ss_ampl[1])
+        np.savetxt(fpath_min1, sol_attractor.ss_ampl[2])
+        np.savetxt(fpath_min2, sol_attractor.ss_ampl[3])
