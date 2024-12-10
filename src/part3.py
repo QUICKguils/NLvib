@@ -38,16 +38,10 @@ def plot_nfrc_backbone(sol_nfrc, sol_nnm) -> None:
     # make sense to plot them here.
     nfrc_dof1_ni2d = np.loadtxt(str(RES_DIR/"nfrc_dof1.csv"), skiprows=1, delimiter=',')
     nfrc_dof2_ni2d = np.loadtxt(str(RES_DIR/"nfrc_dof2.csv"), skiprows=1, delimiter=',')
-    # backbone_dof1_nnm1_ni2d = np.loadtxt(str(RES_DIR/"backbone_dof1_nnm1.csv"), skiprows=1, delimiter=',')
-    # backbone_dof2_nnm1_ni2d = np.loadtxt(str(RES_DIR/"backbone_dof2_nnm1.csv"), skiprows=1, delimiter=',')
-    # backbone_dof1_nnm2_ni2d = np.loadtxt(str(RES_DIR/"backbone_dof1_nnm2.csv"), skiprows=1, delimiter=',')
-    # backbone_dof2_nnm2_ni2d = np.loadtxt(str(RES_DIR/"backbone_dof2_nnm2.csv"), skiprows=1, delimiter=',')
 
     fig, (ax_1, ax_2) = plt.subplots(2, 1, figsize=(6.34, 6.34), layout="constrained")
 
     ax_1.plot(nfrc_dof1_ni2d[:, 0], nfrc_dof1_ni2d[:, 1], color='C7', linewidth=0.4)
-    # ax_1.plot(backbone_dof1_nnm1_ni2d[:, 0], backbone_dof1_nnm1_ni2d[:, 1], color='C7', linewidth=0.6, linestyle='--')
-    # ax_1.plot(backbone_dof1_nnm2_ni2d[:, 0], backbone_dof1_nnm2_ni2d[:, 1], color='C7', linewidth=0.6, linestyle='--')
     ax_2.plot(nfrc_dof2_ni2d[:, 0], nfrc_dof2_ni2d[:, 1], color='C7', linewidth=0.4)
     # ax_2.plot(backbone_dof2_nnm1_ni2d[:, 0], backbone_dof2_nnm1_ni2d[:, 1], color='C7', linewidth=0.6, linestyle='--')
     # ax_2.plot(backbone_dof2_nnm2_ni2d[:, 0], backbone_dof2_nnm2_ni2d[:, 1], color='C7', linewidth=0.6, linestyle='--')
@@ -108,13 +102,13 @@ def plot_nfrc_envelope(sol_nfrc) -> None:
     fig.show()
 
 
-def compute_largest_nnm(sys_free: nlsys.NLSystem, sol_nnm, id_mode=0):
+def compute_largest_nnm(sys_free: nlsys.NLSystem, sol_nnm, n_mode=1):
     # TODO: not robust: break each time the elements order of sol_nnm are modified
     # Take the nnm computed at the highest amplitude
-    if id_mode == 0:
+    if n_mode == 1:
         y0 = sol_nnm[1].y0_range[:, -1]
         largest_tdiv = sol_nnm[1].tdiv_range[-1]
-    if id_mode == 1:
+    if n_mode == 2:
         y0 = sol_nnm[4].y0_range[:, -1]
         largest_tdiv = sol_nnm[4].tdiv_range[-1]
 
@@ -128,61 +122,46 @@ def compute_largest_nnm(sys_free: nlsys.NLSystem, sol_nnm, id_mode=0):
     return largest_nnm, largest_tdiv
 
 
-def plot_nnm_backbone(sol_nnm, nnm, tdiv, id_mode=0) -> None:
+def plot_nnm_backbone(sol_nnm, nnm, tdiv, n_mode=1) -> None:
+    backbone_dof1_ni2d = np.loadtxt(str(RES_DIR/f"backbone_dof1_nnm{n_mode}.csv"), skiprows=1, delimiter=',')
+    backbone_dof2_ni2d = np.loadtxt(str(RES_DIR/f"backbone_dof2_nnm{n_mode}.csv"), skiprows=1, delimiter=',')
+
     fig, axs = plt.subplot_mosaic(
-        [['bb', 'bb'], ['nnm_ps', 'nnm_ss']],
-        figsize=(7, 6),
+        [['bb1', 'bb1'], ['bb2', 'bb2'], ['nnm_ps', 'nnm_ss']],
+        figsize=(7, 7),
         layout='constrained')
 
+    axs['bb1'].plot(backbone_dof1_ni2d[:, 0], backbone_dof1_ni2d[:, 1], color='C7', linewidth=0.6, linestyle='--')
+    axs['bb2'].plot(backbone_dof2_ni2d[:, 0], backbone_dof2_ni2d[:, 1], color='C7', linewidth=0.6, linestyle='--')
+
     # TODO: not robust
-    if id_mode ==0:
+    if n_mode == 1:
         backbone = sol_nnm[:2]
-    if id_mode == 1:
+    if n_mode == 2:
         backbone = sol_nnm[2:]
 
     for bb in backbone:
-        axs['bb'].plot([bb.f for bb in bb.tdiv_range], bb.max_range[0, :], color='C0', linewidth=0.6)
-    axs['bb'].scatter(tdiv.f, bb.max_range[0, -1], color='C2', linewidths=1)
-    axs['bb'].set_title("Backbone")
-    axs['bb'].set_xlabel("Natural frequency [Hz]")
-    axs['bb'].set_ylabel(r"$q_1$ [m]")
-    axs['bb'].ticklabel_format(axis='y', style='sci', scilimits=(0,0))
-    axs['bb'].set_ylim(0, 0.05)
-    axs['bb'].grid(True, linewidth=0.5, alpha=0.3)
+        axs['bb1'].plot([bb.f for bb in bb.tdiv_range], np.abs(bb.min_range[0, :]), color='C0', linewidth=0.6)
+        axs['bb2'].plot([bb.f for bb in bb.tdiv_range], np.abs(bb.min_range[1, :]), color='C0', linewidth=0.6)
 
-    axs['nnm_ps'].plot(nnm.t, nnm.y[0, :].T, linewidth=0.6, label=r"$q_1$")
-    axs['nnm_ps'].plot(nnm.t, nnm.y[1, :].T, linewidth=0.6, label=r"$q_2$")
-    axs['nnm_ps'].set_title("Periodic solution")
-    axs['nnm_ps'].set_xlabel(r"Time [s]")
-    axs['nnm_ps'].set_ylabel(r"$q_1, q_2$ [m]")
-    axs['nnm_ps'].ticklabel_format(axis='y', style='sci', scilimits=(0,0))
-    axs['nnm_ps'].grid(True, linewidth=0.5, alpha=0.3)
-    axs['nnm_ps'].legend()
+    # axs['bb1'].scatter(tdiv.f, np.abs(bb.min_range[0, -1]), color='C2', linewidths=1, marker='x')
+    # axs['bb2'].scatter(tdiv.f, np.abs(bb.min_range[1, -1]), color='C2', linewidths=1, marker='x')
 
-    axs['nnm_ss'].plot(nnm.y[0, :], nnm.y[1, :], color='C0', linewidth=0.6)
-    axs['nnm_ss'].set_title("Configuration space")
-    axs['nnm_ss'].set_xlabel(r"$q_1$ [m]")
-    axs['nnm_ss'].set_ylabel(r"$q_2$ [m]")
-    axs['nnm_ss'].ticklabel_format(axis='both', style='sci', scilimits=(0,0))
-    axs['nnm_ss'].grid(True, linewidth=0.5, alpha=0.3)
-
-    fig.show()
-
-
-def plot_nnm_backbone_ni2d(nnm_backbone_ni2d, id_mode=0) -> None:
-    fig, axs = plt.subplot_mosaic(
-        [['bb', 'bb'], ['nnm_ps', 'nnm_ss']],
-        figsize=(7, 6),
-        layout='constrained')
-
-    axs['bb'].plot([bb.f for bb in bb.tdiv_range], bb.max_range[0, :], color='C0', linewidth=0.6)
-    axs['bb'].scatter(tdiv.f, bb.max_range[0, -1], color='C2', linewidths=1)
-    axs['bb'].set_title("Backbone")
-    axs['bb'].set_xlabel("Natural frequency [Hz]")
-    axs['bb'].set_ylabel(r"$q_1$ [m]")
-    axs['bb'].ticklabel_format(axis='y', style='sci', scilimits=(0,0))
-    axs['bb'].set_ylim(0, 0.05)
-    axs['bb'].grid(True, linewidth=0.5, alpha=0.3)
+    axs['bb1'].set_title("Backbone, DOF 1")
+    axs['bb2'].set_title("Backbone, DOF 2")
+    axs['bb2'].set_xlabel("Natural frequency [Hz]")
+    axs['bb1'].set_ylabel(r"$q_1$ [m]")
+    axs['bb2'].set_ylabel(r"$q_2$ [m]")
+    axs['bb1'].ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+    axs['bb2'].ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+    axs['bb1'].grid(True, linewidth=0.5, alpha=0.3)
+    axs['bb2'].grid(True, linewidth=0.5, alpha=0.3)
+    if n_mode == 1:
+        axs['bb1'].set_ylim(0, 0.065)
+        axs['bb2'].set_ylim(0, 0.1)
+    if n_mode == 2:
+        axs['bb1'].set_ylim(0, 0.065)
+        axs['bb2'].set_ylim(0, 0.045)
 
     axs['nnm_ps'].plot(nnm.t, nnm.y[0, :].T, linewidth=0.6, label=r"$q_1$")
     axs['nnm_ps'].plot(nnm.t, nnm.y[1, :].T, linewidth=0.6, label=r"$q_2$")
@@ -233,9 +212,11 @@ if __name__ == '__main__':
     mplrc.load_rcparams(style='custom')
 
     sys_free, sol_nfrc, sol_nnm = compute_nfrc_backbone()
-    largest = compute_largest_nnm(sys_free, sol_nnm, id_mode=0)
+    largest_1 = compute_largest_nnm(sys_free, sol_nnm, n_mode=1)
+    largest_2 = compute_largest_nnm(sys_free, sol_nnm, n_mode=2)
 
     plot_nfrc_backbone(sol_nfrc, sol_nnm)
     plot_nfrc_envelope(sol_nfrc)
-    plot_nnm_backbone(sol_nnm, *largest)
+    plot_nnm_backbone(sol_nnm, *largest_1, n_mode=1)
+    plot_nnm_backbone(sol_nnm, *largest_2, n_mode=2)
     plot_attractor_2()
