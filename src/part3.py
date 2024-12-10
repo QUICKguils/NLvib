@@ -13,6 +13,10 @@ import nfrc
 import nnm
 
 
+ROOT_DIR = pathlib.Path(__file__).parent.parent
+RES_DIR = ROOT_DIR / "res"
+
+
 def compute_nfrc_backbone():
     # Build the nonlinear forced and free systems
     f_ext_ampl = 50  # Excitation force amplitude (N)
@@ -27,118 +31,175 @@ def compute_nfrc_backbone():
     return sys_free, sol_nfrc, sol_nnm
 
 def plot_nfrc_backbone(sol_nfrc, sol_nnm) -> None:
-    fig, ax = plt.subplots()
+    # NOTE:
+    # the backbones computed by ni2d are the absolute maximum between the
+    # negative and positive amplitudes, while the nfrc are computed as the mean
+    # value of the maximal negative and positive amplitude. It thus does not
+    # make sense to plot them here.
+    nfrc_dof1_ni2d = np.loadtxt(str(RES_DIR/"nfrc_dof1.csv"), skiprows=1, delimiter=',')
+    nfrc_dof2_ni2d = np.loadtxt(str(RES_DIR/"nfrc_dof2.csv"), skiprows=1, delimiter=',')
+    # backbone_dof1_nnm1_ni2d = np.loadtxt(str(RES_DIR/"backbone_dof1_nnm1.csv"), skiprows=1, delimiter=',')
+    # backbone_dof2_nnm1_ni2d = np.loadtxt(str(RES_DIR/"backbone_dof2_nnm1.csv"), skiprows=1, delimiter=',')
+    # backbone_dof1_nnm2_ni2d = np.loadtxt(str(RES_DIR/"backbone_dof1_nnm2.csv"), skiprows=1, delimiter=',')
+    # backbone_dof2_nnm2_ni2d = np.loadtxt(str(RES_DIR/"backbone_dof2_nnm2.csv"), skiprows=1, delimiter=',')
+
+    fig, (ax_1, ax_2) = plt.subplots(2, 1, figsize=(6.34, 6.34), layout="constrained")
+
+    ax_1.plot(nfrc_dof1_ni2d[:, 0], nfrc_dof1_ni2d[:, 1], color='C7', linewidth=0.4)
+    # ax_1.plot(backbone_dof1_nnm1_ni2d[:, 0], backbone_dof1_nnm1_ni2d[:, 1], color='C7', linewidth=0.6, linestyle='--')
+    # ax_1.plot(backbone_dof1_nnm2_ni2d[:, 0], backbone_dof1_nnm2_ni2d[:, 1], color='C7', linewidth=0.6, linestyle='--')
+    ax_2.plot(nfrc_dof2_ni2d[:, 0], nfrc_dof2_ni2d[:, 1], color='C7', linewidth=0.4)
+    # ax_2.plot(backbone_dof2_nnm1_ni2d[:, 0], backbone_dof2_nnm1_ni2d[:, 1], color='C7', linewidth=0.6, linestyle='--')
+    # ax_2.plot(backbone_dof2_nnm2_ni2d[:, 0], backbone_dof2_nnm2_ni2d[:, 1], color='C7', linewidth=0.6, linestyle='--')
+
     for sol in sol_nnm:
-        ax.plot([sol.f for sol in sol.tdiv_range], sol.max_range[0, :], color='C1', linewidth=0.6)
+        avg_max_1 = (np.abs(sol.max_range[0, :]) + np.abs(sol.min_range[0, :]))/2
+        avg_max_2 = (np.abs(sol.max_range[1, :]) + np.abs(sol.min_range[1, :]))/2
+        ax_1.plot([sol.f for sol in sol.tdiv_range], avg_max_1, color='C1', linewidth=0.6)
+        ax_2.plot([sol.f for sol in sol.tdiv_range], avg_max_2, color='C1', linewidth=0.6)
     for sol in sol_nfrc:
-        ax.plot([sol.f for sol in sol.tdiv_range], sol.max_range[0, :], color='C0', linewidth=0.6)
-    ax.set_xlabel(r"Excitation frequency [Hz]")
-    ax.set_ylabel(r"DOF amplitude [m]")
-    ax.grid(True, linewidth=0.5, alpha=0.3)
-    ax.set_xlim(0, 40)
-    ax.set_ylim(0, 0.05)
-    ax.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
-    fig.tight_layout()
+        avg_max_1 = (np.abs(sol.max_range[0, :]) + np.abs(sol.min_range[0, :]))/2
+        avg_max_2 = (np.abs(sol.max_range[1, :]) + np.abs(sol.min_range[1, :]))/2
+        ax_1.plot([sol.f for sol in sol.tdiv_range], avg_max_1, color='C0', linewidth=0.6)
+        ax_2.plot([sol.f for sol in sol.tdiv_range], avg_max_2, color='C0', linewidth=0.6)
+
+    ax_2.set_xlabel(r"Excitation frequency [Hz]")
+    ax_1.set_ylabel(r"$q_1$ amplitude [m]")
+    ax_2.set_ylabel(r"$q_2$ amplitude [m]")
+    ax_1.grid(True, linewidth=0.5, alpha=0.3)
+    ax_2.grid(True, linewidth=0.5, alpha=0.3)
+    ax_1.set_xlim(0, 40)
+    ax_2.set_xlim(0, 40)
+    ax_1.set_ylim(0, 0.055)
+    ax_2.set_ylim(0, 0.085)
+    ax_1.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+    ax_2.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+
     fig.show()
 
 
-def extract_simulation_data(fname: str):
-    ROOT_DIR = pathlib.Path(__file__).parent.parent
-    RES_DIR = ROOT_DIR / "res"
-    DATA_PATH = RES_DIR / fname
-    DATA = io.loadmat(str(DATA_PATH))
-    t = DATA['t']
-    x = DATA['x']
-    freq_start = DATA['ext_force'][0, 2][0][0]
-    freq_end = DATA['ext_force'][0, 3][0][0]
+def plot_nfrc_envelope(sol_nfrc) -> None:
+    sim_data = io.loadmat(str(RES_DIR/"group4_test3_2.mat"))
+    x = sim_data['x']
+    freq_start = sim_data['ext_force'][0, 2][0][0]
+    freq_end = sim_data['ext_force'][0, 3][0][0]
+    freq_sample = np.linspace(freq_start, freq_end, len(x[0]))
 
-    return x, t, freq_start, freq_end
+    fig, (ax_1, ax_2) = plt.subplots(2, 1, figsize=(6.34, 6.34), layout="constrained")
 
-
-def plot_nfrc_envelope(sol_nfrc, x, t, freq_start, freq_end) -> None:
-    freq_sample = np.linspace(freq_start, freq_end, len(t[0]))
-    fig, ax = plt.subplots()
-    ax.plot(freq_sample, x[0, :], color='C0', linewidth=0.6)
+    ax_1.plot(freq_sample, x[0, :], color='C0', linewidth=0.6)
+    ax_2.plot(freq_sample, x[1, :], color='C0', linewidth=0.6)
     for sol in sol_nfrc:
-        ax.plot([sol.f for sol in sol.tdiv_range], sol.max_range[0, :], color='C1', linewidth=0.8)
-        ax.plot([sol.f for sol in sol.tdiv_range], sol.min_range[0, :], color='C1', linewidth=0.8)
-    ax.set_xlabel(r"Excitation frequency [Hz]")
-    ax.set_ylabel(r"DOF amplitude [m]")
-    ax.grid(True, linewidth=0.5, alpha=0.3)
-    ax.set_xlim(0, 40)
-    ax.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
-    fig.tight_layout()
+        ax_1.plot([sol.f for sol in sol.tdiv_range], sol.max_range[0, :], color='C1', linewidth=0.8)
+        ax_1.plot([sol.f for sol in sol.tdiv_range], sol.min_range[0, :], color='C1', linewidth=0.8)
+        ax_2.plot([sol.f for sol in sol.tdiv_range], sol.max_range[1, :], color='C1', linewidth=0.8)
+        ax_2.plot([sol.f for sol in sol.tdiv_range], sol.min_range[1, :], color='C1', linewidth=0.8)
+
+    ax_2.set_xlabel(r"Excitation frequency [Hz]")
+    ax_1.set_ylabel(r"$q_1$ amplitude [m]")
+    ax_2.set_ylabel(r"$q_2$ amplitude [m]")
+    ax_1.grid(True, linewidth=0.5, alpha=0.3)
+    ax_2.grid(True, linewidth=0.5, alpha=0.3)
+    ax_1.set_xlim(0, 40)
+    ax_2.set_xlim(0, 40)
+    ax_1.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+    ax_2.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+
     fig.show()
 
 
-def compute_nnm_bounds(sys_free: nlsys.NLSystem, sol_nnm, id_mode=0):
+def compute_largest_nnm(sys_free: nlsys.NLSystem, sol_nnm, id_mode=0):
     # TODO: not robust: break each time the elements order of sol_nnm are modified
+    # Take the nnm computed at the highest amplitude
     if id_mode == 0:
-        y0_lf = sol_nnm[0].y0_range[:, -1]
-        y0_hf = sol_nnm[1].y0_range[:, -1]
-        tdiv_lf = sol_nnm[0].tdiv_range[-1]
-        tdiv_hf = sol_nnm[1].tdiv_range[-1]
+        y0 = sol_nnm[1].y0_range[:, -1]
+        largest_tdiv = sol_nnm[1].tdiv_range[-1]
     if id_mode == 1:
-        y0_lf = sol_nnm[2].y0_range[:, 0]
-        y0_hf = sol_nnm[4].y0_range[:, -1]
-        tdiv_lf = sol_nnm[2].tdiv_range[0]
-        tdiv_hf = sol_nnm[4].tdiv_range[-1]
+        y0 = sol_nnm[4].y0_range[:, -1]
+        largest_tdiv = sol_nnm[4].tdiv_range[-1]
 
-    nnm_lf = solve_ivp(
+    largest_nnm = solve_ivp(
         sys_free.integrand,
-        [0, tdiv_lf.T],
-        y0_lf,
-        args=(tdiv_lf.w,),
-        t_eval=np.linspace(0, tdiv_lf.T, 300))
-    nnm_hf = solve_ivp(
-        sys_free.integrand,
-        [0, tdiv_hf.T],
-        y0_hf,
-        args=(tdiv_hf.w,),
-        t_eval=np.linspace(0, tdiv_hf.T, 300))
+        [0, largest_tdiv.T],
+        y0,
+        args=(largest_tdiv.w,),
+        t_eval=np.linspace(0, largest_tdiv.T, 300))
 
-    return nnm_lf, nnm_hf, tdiv_lf, tdiv_hf
+    return largest_nnm, largest_tdiv
 
 
-def plot_nnm_periodic_sol(nnm_lf, nnm_hf, tdiv_lf, tdiv_hf) -> None:
-    fig, (ax_lf, ax_hf) = plt.subplots(1, 2)
+def plot_nnm_backbone(sol_nnm, nnm, tdiv, id_mode=0) -> None:
+    fig, axs = plt.subplot_mosaic(
+        [['bb', 'bb'], ['nnm_ps', 'nnm_ss']],
+        figsize=(7, 6),
+        layout='constrained')
 
-    ax_lf.plot(nnm_lf.t, nnm_lf.y[:2, :].T, linewidth=0.6)
-    ax_lf.set_title(f"{tdiv_lf.f:.2f} Hz")
-    ax_lf.set_xlabel(r"Time [s]")
-    ax_lf.set_ylabel(r"$x_1, x_2$ [m]")
-    ax_lf.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
-    ax_lf.grid(True, linewidth=0.5, alpha=0.3)
+    # TODO: not robust
+    if id_mode ==0:
+        backbone = sol_nnm[:2]
+    if id_mode == 1:
+        backbone = sol_nnm[2:]
 
-    ax_hf.plot(nnm_hf.t, nnm_hf.y[:2, :].T, linewidth=0.6)
-    ax_hf.set_title(f"{tdiv_hf.f:.2f} Hz")
-    ax_hf.set_xlabel(r"Time [s]")
-    ax_hf.set_ylabel(r"$x_1, x_2$ [m]")
-    ax_hf.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
-    ax_hf.grid(True, linewidth=0.5, alpha=0.3)
+    for bb in backbone:
+        axs['bb'].plot([bb.f for bb in bb.tdiv_range], bb.max_range[0, :], color='C0', linewidth=0.6)
+    axs['bb'].scatter(tdiv.f, bb.max_range[0, -1], color='C2', linewidths=1)
+    axs['bb'].set_title("Backbone")
+    axs['bb'].set_xlabel("Natural frequency [Hz]")
+    axs['bb'].set_ylabel(r"$q_1$ [m]")
+    axs['bb'].ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+    axs['bb'].set_ylim(0, 0.05)
+    axs['bb'].grid(True, linewidth=0.5, alpha=0.3)
 
-    fig.tight_layout()
+    axs['nnm_ps'].plot(nnm.t, nnm.y[0, :].T, linewidth=0.6, label=r"$q_1$")
+    axs['nnm_ps'].plot(nnm.t, nnm.y[1, :].T, linewidth=0.6, label=r"$q_2$")
+    axs['nnm_ps'].set_title("Periodic solution")
+    axs['nnm_ps'].set_xlabel(r"Time [s]")
+    axs['nnm_ps'].set_ylabel(r"$q_1, q_2$ [m]")
+    axs['nnm_ps'].ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+    axs['nnm_ps'].grid(True, linewidth=0.5, alpha=0.3)
+    axs['nnm_ps'].legend()
+
+    axs['nnm_ss'].plot(nnm.y[0, :], nnm.y[1, :], color='C0', linewidth=0.6)
+    axs['nnm_ss'].set_title("Configuration space")
+    axs['nnm_ss'].set_xlabel(r"$q_1$ [m]")
+    axs['nnm_ss'].set_ylabel(r"$q_2$ [m]")
+    axs['nnm_ss'].ticklabel_format(axis='both', style='sci', scilimits=(0,0))
+    axs['nnm_ss'].grid(True, linewidth=0.5, alpha=0.3)
+
     fig.show()
 
 
-def plot_nnm_config_space(nnm_lf, nnm_hf, tdiv_lf, tdiv_hf) -> None:
-    fig, (ax_lf, ax_hf) = plt.subplots(1, 2)
+def plot_nnm_backbone_ni2d(nnm_backbone_ni2d, id_mode=0) -> None:
+    fig, axs = plt.subplot_mosaic(
+        [['bb', 'bb'], ['nnm_ps', 'nnm_ss']],
+        figsize=(7, 6),
+        layout='constrained')
 
-    ax_lf.plot(nnm_lf.y[0, :], nnm_lf.y[1, :], color='C0', linewidth=0.6)
-    ax_lf.set_title(f"{tdiv_lf.f:.2f} Hz")
-    ax_lf.set_xlabel(r"$x_1$ [m]")
-    ax_lf.set_ylabel(r"$x_2$ [m]")
-    ax_lf.ticklabel_format(axis='both', style='sci', scilimits=(0,0))
-    ax_lf.grid(True, linewidth=0.5, alpha=0.3)
+    axs['bb'].plot([bb.f for bb in bb.tdiv_range], bb.max_range[0, :], color='C0', linewidth=0.6)
+    axs['bb'].scatter(tdiv.f, bb.max_range[0, -1], color='C2', linewidths=1)
+    axs['bb'].set_title("Backbone")
+    axs['bb'].set_xlabel("Natural frequency [Hz]")
+    axs['bb'].set_ylabel(r"$q_1$ [m]")
+    axs['bb'].ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+    axs['bb'].set_ylim(0, 0.05)
+    axs['bb'].grid(True, linewidth=0.5, alpha=0.3)
 
-    ax_hf.plot(nnm_hf.y[0, :], nnm_hf.y[1, :], color='C0', linewidth=0.6)
-    ax_hf.set_title(f"{tdiv_hf.f:.2f} Hz")
-    ax_hf.set_xlabel(r"$x_1$ [m]")
-    ax_hf.set_ylabel(r"$x_2$ [m]")
-    ax_hf.ticklabel_format(axis='both', style='sci', scilimits=(0,0))
-    ax_hf.grid(True, linewidth=0.5, alpha=0.3)
+    axs['nnm_ps'].plot(nnm.t, nnm.y[0, :].T, linewidth=0.6, label=r"$q_1$")
+    axs['nnm_ps'].plot(nnm.t, nnm.y[1, :].T, linewidth=0.6, label=r"$q_2$")
+    axs['nnm_ps'].set_title("Periodic solution")
+    axs['nnm_ps'].set_xlabel(r"Time [s]")
+    axs['nnm_ps'].set_ylabel(r"$q_1, q_2$ [m]")
+    axs['nnm_ps'].ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+    axs['nnm_ps'].grid(True, linewidth=0.5, alpha=0.3)
+    axs['nnm_ps'].legend()
 
-    fig.tight_layout()
+    axs['nnm_ss'].plot(nnm.y[0, :], nnm.y[1, :], color='C0', linewidth=0.6)
+    axs['nnm_ss'].set_title("Configuration space")
+    axs['nnm_ss'].set_xlabel(r"$q_1$ [m]")
+    axs['nnm_ss'].set_ylabel(r"$q_2$ [m]")
+    axs['nnm_ss'].ticklabel_format(axis='both', style='sci', scilimits=(0,0))
+    axs['nnm_ss'].grid(True, linewidth=0.5, alpha=0.3)
+
     fig.show()
 
 
@@ -169,15 +230,12 @@ def plot_attractor_2() -> None:
 
 if __name__ == '__main__':
 
-    mplrc.load_rcparams()
+    mplrc.load_rcparams(style='custom')
 
-    # sys_free, sol_nfrc, sol_nnm = compute_nfrc_backbone()
-    # sim_data = extract_simulation_data("group4_test3_2.mat")
-    # nnm_fbounds = compute_nnm_bounds(sys_free, sol_nnm, id_mode=0)
+    sys_free, sol_nfrc, sol_nnm = compute_nfrc_backbone()
+    largest = compute_largest_nnm(sys_free, sol_nnm, id_mode=0)
 
-    # plot_nfrc_backbone(sol_nfrc, sol_nnm)
-    # plot_nfrc_envelope(sol_nfrc, *sim_data)
-    # plot_nnm_periodic_sol(*nnm_fbounds)
-    # plot_nnm_config_space(*nnm_fbounds)
-
+    plot_nfrc_backbone(sol_nfrc, sol_nnm)
+    plot_nfrc_envelope(sol_nfrc)
+    plot_nnm_backbone(sol_nnm, *largest)
     plot_attractor_2()

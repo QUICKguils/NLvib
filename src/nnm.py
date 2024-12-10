@@ -51,13 +51,14 @@ def compute_nnm(sys, continuation=shooting.basic_continuation):
     return sol_nnm
 
 
-def plot_backbone(sol_nnm) -> None:
+def plot_backbone(sol_nnm, n_dof=0) -> None:
     # Plot the natural freq amplitude of DOF x1
     fig, ax = plt.subplots(figsize=(5.5, 3.5), layout="constrained")
     for sol in sol_nnm:
-        ax.plot([sol.f for sol in sol.tdiv_range], sol.max_range[0, :])
+        avg_max = (np.abs(sol.max_range[n_dof, :]) + np.abs(sol.min_range[n_dof, :]))/2
+        ax.plot([sol.f for sol in sol.tdiv_range], avg_max)
     ax.set_xlabel('Natural frequency (Hz)')
-    ax.set_ylabel('DOF amplitude (m)')
+    ax.set_ylabel(f"$q_{n_dof+1}$ amplitude [m]")
     ax.set_title("Backbone of the NNMs")
     ax.grid()
     fig.show()

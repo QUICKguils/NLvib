@@ -57,13 +57,13 @@ def compute_nfrc(sys, y0_guess, continuation=shooting.basic_continuation):
     return sol_nfrc
 
 
-# TODO: allow to plot for DOF2
-def plot_nfrc(sol_nfrc) -> None:
+def plot_nfrc(sol_nfrc, n_dof=0) -> None:
     fig, ax = plt.subplots(figsize=(5.5, 3.5), layout="constrained")
     for sol in sol_nfrc:
-        ax.plot([sol.f for sol in sol.tdiv_range], sol.max_range[0, :])
+        avg_max = (np.abs(sol.max_range[n_dof, :]) + np.abs(sol.min_range[n_dof, :]))/2
+        ax.plot([sol.f for sol in sol.tdiv_range], avg_max)
     ax.set_xlabel('Excitation frequency (Hz)')
-    ax.set_ylabel('DOF amplitude (m)')
+    ax.set_ylabel(f"$q_{n_dof+1}$ amplitude [m]")
     ax.set_title("NFRC")
     ax.grid()
     fig.show()
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     sol_nfrc = compute_nfrc(sys_forced, y0_guess)
     plot_nfrc(sol_nfrc)
 
-    # Verify one of the system response, at a given excitation frequency
-    f_ext_tdiv = nlsys.TimeDivision()
-    f_ext_tdiv.f = 15
-    shooting_sol_forced = shooting.plot_BVP(sys_forced, y0_guess, f_ext_tdiv)
+    # # Verify one of the system response, at a given excitation frequency
+    # f_ext_tdiv = nlsys.TimeDivision()
+    # f_ext_tdiv.f = 15
+    # shooting_sol_forced = shooting.plot_BVP(sys_forced, y0_guess, f_ext_tdiv)
