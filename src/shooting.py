@@ -60,7 +60,7 @@ class ContinuationSolution(NamedTuple):
     """Solution of a sequential continuation computation.
     y0_range  -- IC solutions of the BVP, for the desired tdiv_range.
     max_range -- Corresponding DOFs maximum displacement.
-    max_range -- Corresponding DOFs minimum displacement.
+    min_range -- Corresponding DOFs minimum displacement.
     """
     tdiv_range: np.ndarray
     y0_range:   np.ndarray
