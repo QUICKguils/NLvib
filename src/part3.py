@@ -30,6 +30,7 @@ def compute_nfrc_backbone():
 
     return sys_free, sol_nfrc, sol_nnm
 
+
 def plot_nfrc_backbone(sol_nfrc, sol_nnm) -> None:
     # NOTE:
     # the backbones computed by ni2d are the absolute maximum between the
@@ -57,7 +58,7 @@ def plot_nfrc_backbone(sol_nfrc, sol_nnm) -> None:
         ax_1.plot([sol.f for sol in sol.tdiv_range], avg_max_1, color='C0', linewidth=0.6)
         ax_2.plot([sol.f for sol in sol.tdiv_range], avg_max_2, color='C0', linewidth=0.6)
 
-    ax_2.set_xlabel(r"Excitation frequency [Hz]")
+    ax_2.set_xlabel(r"Oscillation frequency [Hz]")
     ax_1.set_ylabel(r"$q_1$ amplitude [m]")
     ax_2.set_ylabel(r"$q_2$ amplitude [m]")
     ax_1.grid(True, linewidth=0.5, alpha=0.3)
@@ -89,7 +90,7 @@ def plot_nfrc_envelope(sol_nfrc) -> None:
         ax_2.plot([sol.f for sol in sol.tdiv_range], sol.max_range[1, :], color='C1', linewidth=0.8)
         ax_2.plot([sol.f for sol in sol.tdiv_range], sol.min_range[1, :], color='C1', linewidth=0.8)
 
-    ax_2.set_xlabel(r"Excitation frequency [Hz]")
+    ax_2.set_xlabel(r"Oscillation frequency [Hz]")
     ax_1.set_ylabel(r"$q_1$ amplitude [m]")
     ax_2.set_ylabel(r"$q_2$ amplitude [m]")
     ax_1.grid(True, linewidth=0.5, alpha=0.3)
@@ -182,7 +183,10 @@ def plot_nnm_backbone(sol_nnm, nnm, tdiv, n_mode=1) -> None:
     fig.show()
 
 
-def plot_attractor_2() -> None:
+def plot_state_space_attractor() -> None:
+    #NOTE:
+    # The attractor were really heavy to compute.
+    # The results were then stored in text files.
     ROOT_DIR = pathlib.Path(__file__).parent.parent
     OUT_DIR = ROOT_DIR / "out"
     AT = np.loadtxt(str(OUT_DIR / "above_left_max_dof1.txt"))
@@ -190,25 +194,112 @@ def plot_attractor_2() -> None:
     CT = np.flip(np.loadtxt(str(OUT_DIR / "below_left_max_dof1.txt")), 1)
     DT = np.loadtxt(str(OUT_DIR / "below_right_max_dof1.txt"))
 
-    ss_ampl = np.vstack((np.hstack((AT, CT)), np.hstack((BT, DT)))).T
+    # Re-assemble the results of the second attractor
+    ss_ampl_2 = np.vstack((np.hstack((AT, CT)), np.hstack((BT, DT)))).T
 
-    fig, ax = plt.subplots()
-    ax.set_aspect('equal', adjustable='box')
+    # Polarize the results to the extremum values, for better readability on the plot
+    idxs_max_2 = np.unravel_index(np.argmax(ss_ampl_2, axis=None), ss_ampl_2.shape)
+    ss_ampl_2[idxs_max_2[0]][idxs_max_2[1]] = ss_ampl_2[idxs_max_2[0] + 1][idxs_max_2[1] + 1]
+
+    # Results of the first attractor
+    ss_ampl_1 = np.transpose(np.loadtxt(str(OUT_DIR/"attractor_1.txt")))
+
+    fig, (ax1, ax2) = plt.subplots(1,2, sharey=True)
 
     dof_sample = np.linspace(-0.2, 0.2, 200)
     dof1_mat, dof2_mat = np.meshgrid(dof_sample, dof_sample)
 
-    ax.pcolormesh(dof1_mat, dof2_mat, ss_ampl, cmap='bwr')
+    ax1.pcolormesh(dof1_mat, dof2_mat, np.round(ss_ampl_1, 2), cmap='bwr', edgecolors='face')
+    ax2.pcolormesh(dof1_mat, dof2_mat, np.round(ss_ampl_2, 2), cmap='bwr', edgecolors='face')
 
-    ax.set_xlabel(r'Initial displacement $x_{1}(0)$ [m]')
-    ax.set_ylabel(r'Initial displacement $x_{2}(0)$ [m]')
+    ax1.set_xlabel(r'Initial displacement $q_{1}(0)$ [m]')
+    ax2.set_xlabel(r'Initial displacement $q_{1}(0)$ [m]')
+
+    ax1.set_ylabel(r'Initial displacement $q_{2}(0)$ [m]')
+    ax1.set_aspect('equal', adjustable='box')
+    ax2.set_aspect('equal', adjustable='box')
+
+    fig.tight_layout()
+    fig.show()
+
+
+def plot_time_attractor(sys_forced: nlsys.NLSystem) -> None:
+    # Integration time
+    tdiv_int = nlsys.TimeDivision()
+    tdiv_int.T = 15
+
+    # Time responses of the first attractor
+
+    tdiv_1 = nlsys.TimeDivision()
+    tdiv_1.f = 18
+
+    y01_1 = [0, -0.047, 0, 0]
+    y02_1 = [0, -0.048, 0, 0]
+
+    y1_1 = solve_ivp(
+        sys_forced.integrand,
+        [0, tdiv_int.T],
+        y01_1,
+        args=(tdiv_1.w,),
+        t_eval=np.linspace(0, tdiv_int.T, 20_000))
+    y2_1 = solve_ivp(
+        sys_forced.integrand,
+        [0, tdiv_int.T],
+        y02_1,
+        args=(tdiv_1.w,),
+        t_eval=np.linspace(0, tdiv_int.T, 20_000))
+
+    # Time responses of the second attractor
+
+    # Choose an excitation frequency
+    tdiv_2 = nlsys.TimeDivision()
+    tdiv_2.f = 28.4
+
+    y01_2 = [0, -0.072, 0, 0]
+    y02_2 = [0, -0.073, 0, 0]
+
+    y1_2 = solve_ivp(
+        sys_forced.integrand,
+        [0, tdiv_int.T],
+        y01_2, args=(tdiv_2.w,),
+        t_eval=np.linspace(0, tdiv_int.T, 20_000))
+    y2_2 = solve_ivp(
+        sys_forced.integrand,
+        [0, tdiv_int.T],
+        y02_2, args=(tdiv_2.w,),
+        t_eval=np.linspace(0, tdiv_int.T, 20_000))
+
+    fig, (ax1, ax2) = plt.subplots(1,2,sharey=True)
+
+    ax1.plot(y2_1.t, y2_1.y[0, :].T, color='red', linewidth=0.2)
+    ax1.plot(y1_1.t, y1_1.y[0, :].T, color='blue', linewidth=0.2)
+
+    ax2.plot(y2_2.t, y2_2.y[0, :].T, color='red', linewidth=0.2)
+    ax2.plot(y1_2.t, y1_2.y[0, :].T, color='blue', linewidth=0.2)
+
+    ax1.set_xlabel(r'Time [s]')
+    ax2.set_xlabel(r'Time [s]')
+    ax1.set_ylabel(r'Displacement $q_{1}(t)$ [m]',)
+    ax1.grid(linewidth=0.5, alpha=0.3)
+    ax2.grid(linewidth=0.5, alpha=0.3)
+    ax1.set_xlim(0, tdiv_int.T)
+    ax2.set_xlim(0, tdiv_int.T)
+    ax1.set_ylim(-0.065, 0.055)
+
+    ax1.text(0.55, 0.03, r'$q_{2}(0)$ = $- 0.047$ [m]', color='blue', ha='center', transform=ax1.transAxes)
+    ax1.text(0.55, 0.92, r'$q_{2}(0)$ = $- 0.048$ [m]', color='red', ha='center', transform=ax1.transAxes)
+
+    ax2.text(0.55, 0.03, r'$q_{2}(0)$ = $- 0.072$ [m]',  color='blue', ha='center', transform=ax2.transAxes)
+    ax2.text(0.55, 0.92, r'$q_{2}(0)$ = $- 0.073$ [m]',  color='red', ha='center', transform=ax2.transAxes)
+
+    fig.suptitle(r'$q_1(0)$ = $0$ [m]',x = 0.52, y = 0.88,fontsize=11)
+    plt.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
 
     fig.tight_layout()
     fig.show()
 
 
 if __name__ == '__main__':
-
     mplrc.load_rcparams(style='custom')
 
     sys_free, sol_nfrc, sol_nnm = compute_nfrc_backbone()
@@ -219,4 +310,9 @@ if __name__ == '__main__':
     plot_nfrc_envelope(sol_nfrc)
     plot_nnm_backbone(sol_nnm, *largest_1, n_mode=1)
     plot_nnm_backbone(sol_nnm, *largest_2, n_mode=2)
-    plot_attractor_2()
+
+    f_ext_ampl = 50  # Excitation force amplitude (N)
+    sys_forced = nlsys.build_damped_forced_system(nlsys.f_nl, f_ext_ampl)
+
+    plot_state_space_attractor()
+    plot_time_attractor(sys_forced)
