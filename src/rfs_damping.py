@@ -1,9 +1,17 @@
 """Quantification of damping nonlinearities with the restoring force surface (RFS) method."""
 
+import pathlib
+
 import matplotlib.pyplot as plt
 from matplotlib.ticker import LogLocator
 import numpy as np
-import scipy.io as sio
+from scipy import io
+
+from nlsys import M, C, K
+
+ROOT_DIR = pathlib.Path(__file__).parent.parent
+RES_DIR = ROOT_DIR / "res"
+OUT_DIR = ROOT_DIR / "out"
 
 
 def build_row(n, vect1, vect2, idx_time):
@@ -36,12 +44,6 @@ def func_matrix(n, vect1, vect2):
     return f_mtrx
 
 
-# Constant structural matrices of the linear system
-M = [[1, 0], [0, 1]]
-C = [[3, -1], [-1, 3]]
-K = [[2*1e4, -1*1e4], [-1*1e4, 2*1e4]]
-
-
 def measure_matrix(f_ext_vect, q_dot_dot_vect, q_dot_vect, q_vect):
     # all vectors contain only the selected time interval
     measured_mtrx = (
@@ -50,11 +52,11 @@ def measure_matrix(f_ext_vect, q_dot_dot_vect, q_dot_vect, q_vect):
             - np.transpose(q_dot_vect) @ C
             - np.transpose(q_vect) @ K
     )
+
     return measured_mtrx
 
 
-file_name = 'data_test/group4_test3_1.mat'
-data = sio.loadmat(file_name)
+data = io.loadmat(str(RES_DIR/"group4_test3_1.mat"))
 
 dt = 5e-5
 
@@ -98,7 +100,7 @@ x1_minus_x2_coeffs2 = np.zeros((n_max - n_base + 1, n_base))
 orders_array = np.arange(n_base, n_max + 1, 1)
 
 for i in range(len(orders_array)):
-    print(orders_array[i])
+    print(f"RFS dampings: order {orders_array[i]}")
     n_order = orders_array[i]
 
     Ai = func_matrix(n_order, vect1, vect2)
@@ -115,14 +117,6 @@ for i in range(len(orders_array)):
     x1_coeffs2[i, :] = abs(ki[:n_base, 1])
     x2_coeffs2[i, :] = abs(ki[n_order:n_order + n_base, 1])
     x1_minus_x2_coeffs2[i, :] = abs(ki[2*n_order:2*n_order + n_base, 1])
-
-# np.savetxt('damping_k_coeffs/x1_1.txt', x1_coeffs1)
-# np.savetxt('damping_k_coeffs/x2_1.txt', x2_coeffs1)
-# np.savetxt('damping_k_coeffs/x1_minus_x2_1.txt', x1_minus_x2_coeffs1)
-#
-# np.savetxt('damping_k_coeffs/x1_2.txt', x1_coeffs2)
-# np.savetxt('damping_k_coeffs/x2_2.txt', x2_coeffs2)
-# np.savetxt('damping_k_coeffs/x1_minus_x2_2.txt', x1_minus_x2_coeffs2)
 
 x1_coeffs1 = np.loadtxt('damping_k_coeffs/x1_1.txt')
 x2_coeffs1 = np.loadtxt('damping_k_coeffs/x1_1.txt')
@@ -183,12 +177,10 @@ plt.subplots_adjust(wspace=0.08)
 
 plt.minorticks_off()
 
-#plt.ylim(1e-5, 1e3)
-#plt.yticks([1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3])
+# plt.ylim(1e-5, 1e3)
+# plt.yticks([1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3])
 
-plt.savefig('Convergence_coeffs_damping_to_' + str(n_max) + '.pdf', format = 'pdf',bbox_inches='tight', dpi=1000)
 plt.show()
-
 
 # measured_forces = np.transpose(f_ext_vect - M @ acc_vect - C @ vel_vect - K @ disp_vect)
 #

@@ -1,8 +1,16 @@
 """Quantification of stiffness nonlinearities with the restoring force surface (RFS) method."""
 
+import pathlib
+
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.io as sio
+from scipy import io
+
+from nlsys import M, C, K
+
+ROOT_DIR = pathlib.Path(__file__).parent.parent
+RES_DIR = ROOT_DIR / "res"
+OUT_DIR = ROOT_DIR / "out"
 
 
 def build_row(n, vect1, vect2, idx_time):
@@ -35,11 +43,6 @@ def func_matrix(n, vect1, vect2):
     return f_mtrx
 
 
-# Constant structural matrices of the linear system
-M = [[1, 0], [0, 1]]
-C = [[3, -1], [-1, 3]]
-K = [[2*1e4, -1*1e4], [-1*1e4, 2*1e4]]
-
 def measure_matrix(f_ext_vect, q_dot_dot_vect, q_dot_vect, q_vect):
     # all vectors contain only the selected time interval
     measured_mtrx = (
@@ -51,8 +54,8 @@ def measure_matrix(f_ext_vect, q_dot_dot_vect, q_dot_vect, q_vect):
 
     return measured_mtrx
 
-file_name = 'data_test/group4_test3_1.mat'
-data = sio.loadmat(file_name)
+
+data = io.loadmat(str(RES_DIR/"group4_test3_1.mat"))
 
 dt = 5e-5
 
@@ -64,10 +67,12 @@ t_max = 140
 idx_t_min = int(t_min/dt)
 idx_t_max = int(t_max/dt)
 
-acc_vect = data['xdd'][:, idx_t_min:idx_t_max:10]
-vel_vect = data['xd'][:, idx_t_min:idx_t_max:10]
-disp_vect = data['x'][:, idx_t_min:idx_t_max:10]
-f_ext_vect = data['pex'][:, idx_t_min:idx_t_max:10]
+skip_nb = 10
+
+acc_vect = data['xdd'][:, idx_t_min:idx_t_max:skip_nb]
+vel_vect = data['xd'][:, idx_t_min:idx_t_max:skip_nb]
+disp_vect = data['x'][:, idx_t_min:idx_t_max:skip_nb]
+f_ext_vect = data['pex'][:, idx_t_min:idx_t_max:skip_nb]
 
 # stiffness -> use displacements
 vect1 = disp_vect[0][:]
@@ -94,7 +99,7 @@ x1_minus_x2_coeffs2 = np.zeros((n_max - n_base + 1, n_base))
 orders_array = np.arange(n_base, n_max + 1, 1)
 
 for i in range(len(orders_array)):
-    print(orders_array[i])
+    print(f"RFS stiffnesses: order {orders_array[i]}")
     n_order = orders_array[i]
 
     Ai = func_matrix(n_order, vect1, vect2)
@@ -112,13 +117,13 @@ for i in range(len(orders_array)):
     x2_coeffs2[i, :] = abs(ki[n_order:n_order + n_base, 1])
     x1_minus_x2_coeffs2[i, :] = abs(ki[2*n_order:2*n_order + n_base, 1])
 
-np.savetxt('k_coeffs/x1_1.txt', x1_coeffs1)
-np.savetxt('k_coeffs/x2_1.txt', x2_coeffs1)
-np.savetxt('k_coeffs/x1_minus_x2_1.txt', x1_minus_x2_coeffs1)
-
-np.savetxt('k_coeffs/x1_2.txt', x1_coeffs2)
-np.savetxt('k_coeffs/x2_2.txt', x2_coeffs2)
-np.savetxt('k_coeffs/x1_minus_x2_2.txt', x1_minus_x2_coeffs2)
+save_dir = OUT_DIR / 'k_coeffs'
+np.savetxt(str(save_dir/'x1_1.txt'), x1_coeffs1)
+np.savetxt(str(save_dir/'x2_1.txt'), x2_coeffs1)
+np.savetxt(str(save_dir/'x1_minus_x2_1.txt'), x1_minus_x2_coeffs1)
+np.savetxt(str(save_dir/'x1_2.txt'), x1_coeffs2)
+np.savetxt(str(save_dir/'x2_2.txt'), x2_coeffs2)
+np.savetxt(str(save_dir/'x1_minus_x2_2.txt'), x1_minus_x2_coeffs2)
 
 # # load data
 # x1_coeffs1 = np.loadtxt('k_coeffs/x1_1.txt')
@@ -153,7 +158,6 @@ np.savetxt('k_coeffs/x1_minus_x2_2.txt', x1_minus_x2_coeffs2)
 # plt.xlabel('Max. order', font='Times New Roman', fontsize=fs)
 # plt.ylabel('Coefficients'' values', font='Times New Roman', fontsize=fs)
 #
-# plt.savefig('stiffness_coeffs1.pdf', dpi=1000, bbox_inches='tight')
 # plt.show()
 #
 # # plot for dof 2
@@ -179,7 +183,6 @@ np.savetxt('k_coeffs/x1_minus_x2_2.txt', x1_minus_x2_coeffs2)
 # plt.xlabel('Max. order', font='Times New Roman', fontsize=fs)
 # plt.ylabel('Coefficients'' values', font='Times New Roman', fontsize=fs)
 #
-# plt.savefig('stiffness_coeffs2.pdf', dpi=1000, bbox_inches='tight')
 # plt.show()
 
 fig, axs = plt.subplots(1, 2, sharey=True, figsize=(10, 5))
@@ -232,7 +235,6 @@ plt.ylim(1e-10, 1e7 + 8e7)
 
 # plt.yticks([1e-9, 1e-7, 1e-5, 1e-3, 1, 1e1, 1e3, 1e5, 1e7])
 
-plt.savefig('Convergence_coeffs.pdf', format = 'pdf',bbox_inches='tight', dpi=1000)
 plt.show()
 
 # # -- order of polynomial --
@@ -378,5 +380,4 @@ plt.show()
 # plt.vlines(n_max + 1, ymin=np.min(errors_1), ymax=np.max(errors_1), linestyle='dashed', color='gray')
 # plt.vlines(2*n_max + 1, ymin=np.min(errors_1), ymax=np.max(errors_1), linestyle='dashed', color='gray')
 #
-# plt.savefig('MSEs.pdf', dpi=1000, bbox_inches='tight')
 # plt.show()
