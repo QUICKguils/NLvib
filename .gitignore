@@ -1,6 +1,3 @@
-# Output directory (plots, solutions, etc.)
-out/
-
 # Huge resource directory (MAT files)
 res/
 
