@@ -181,8 +181,6 @@ def _plot_time_response(sys_forced: nlsys.NLSystem, y0, f_ext_tdiv: nlsys.TimeDi
 
 
 if __name__ == '__main__':
-    pass
-
     # Build the nonlinear forced system
     f_ext_ampl = 50  # Excitation force amplitude (N)
     sys_forced = nlsys.build_damped_forced_system(nlsys.f_nl, f_ext_ampl)

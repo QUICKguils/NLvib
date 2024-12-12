@@ -1,10 +1,6 @@
 """Computation of the nonlinear normal modes (NNMs)."""
 
-# TODO:
-# - must have an init method for TimeDivision, otherwise it is painful to set
-#   an array of TimeDivision (see the test_basic_continuation function).
-#   Maybe one can inspire from the aeroE code:
-#   fft_signals = np.zeros(extracted_signals.shape[:2], dtype=ld.ExtractedSignal)
+# TODO: must have an init method for TimeDivision, otherwise it is painful to set
 
 import matplotlib.pyplot as plt
 import numpy as np
