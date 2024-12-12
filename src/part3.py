@@ -73,7 +73,7 @@ def plot_nfrc_backbone(sol_nfrc, sol_nnm) -> None:
 
 
 def plot_nfrc_envelope(sol_nfrc) -> None:
-    sim_data = io.loadmat(str(RES_DIR/"group4_test3_2.mat"))
+    sim_data = io.loadmat(str(RES_DIR/"group4_test3_1.mat"))
     x = sim_data['x']
     freq_start = sim_data['ext_force'][0, 2][0][0]
     freq_end = sim_data['ext_force'][0, 3][0][0]
