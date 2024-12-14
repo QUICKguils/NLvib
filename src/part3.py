@@ -9,6 +9,7 @@ from scipy.integrate import solve_ivp
 
 import mplrc  # Set the plot dressing
 import nlsys
+import shooting
 import nfrc
 import nnm
 
@@ -40,25 +41,24 @@ def plot_nfrc_backbone(sol_nfrc, sol_nnm) -> None:
     nfrc_dof1_ni2d = np.loadtxt(str(RES_DIR/"nfrc_dof1.csv"), skiprows=1, delimiter=',')
     nfrc_dof2_ni2d = np.loadtxt(str(RES_DIR/"nfrc_dof2.csv"), skiprows=1, delimiter=',')
 
-    fig, (ax_1, ax_2) = plt.subplots(2, 1, figsize=(6.34, 6.34), layout="constrained")
+    fig, (ax_1, ax_2) = plt.subplots(1, 2, figsize=(10, 4), layout="constrained")
 
-    ax_1.plot(nfrc_dof1_ni2d[:, 0], nfrc_dof1_ni2d[:, 1], color='C7', linewidth=0.4)
-    ax_2.plot(nfrc_dof2_ni2d[:, 0], nfrc_dof2_ni2d[:, 1], color='C7', linewidth=0.4)
-    # ax_2.plot(backbone_dof2_nnm1_ni2d[:, 0], backbone_dof2_nnm1_ni2d[:, 1], color='C7', linewidth=0.6, linestyle='--')
-    # ax_2.plot(backbone_dof2_nnm2_ni2d[:, 0], backbone_dof2_nnm2_ni2d[:, 1], color='C7', linewidth=0.6, linestyle='--')
+    ax_1.plot(nfrc_dof1_ni2d[:, 0], nfrc_dof1_ni2d[:, 1], color='C1', linewidth=1, linestyle="--")
+    ax_2.plot(nfrc_dof2_ni2d[:, 0], nfrc_dof2_ni2d[:, 1], color='C1', linewidth=1, linestyle="--")
 
     for sol in sol_nnm:
         avg_max_1 = (np.abs(sol.max_range[0, :]) + np.abs(sol.min_range[0, :]))/2
         avg_max_2 = (np.abs(sol.max_range[1, :]) + np.abs(sol.min_range[1, :]))/2
-        ax_1.plot([sol.f for sol in sol.tdiv_range], avg_max_1, color='C1', linewidth=0.6)
-        ax_2.plot([sol.f for sol in sol.tdiv_range], avg_max_2, color='C1', linewidth=0.6)
+        ax_1.plot([sol.f for sol in sol.tdiv_range], avg_max_1, color='C7', linewidth=1)
+        ax_2.plot([sol.f for sol in sol.tdiv_range], avg_max_2, color='C7', linewidth=1)
     for sol in sol_nfrc:
         avg_max_1 = (np.abs(sol.max_range[0, :]) + np.abs(sol.min_range[0, :]))/2
         avg_max_2 = (np.abs(sol.max_range[1, :]) + np.abs(sol.min_range[1, :]))/2
-        ax_1.plot([sol.f for sol in sol.tdiv_range], avg_max_1, color='C0', linewidth=0.6)
-        ax_2.plot([sol.f for sol in sol.tdiv_range], avg_max_2, color='C0', linewidth=0.6)
+        ax_1.plot([sol.f for sol in sol.tdiv_range], avg_max_1, color='C0', linewidth=1.4)
+        ax_2.plot([sol.f for sol in sol.tdiv_range], avg_max_2, color='C0', linewidth=1.4)
 
-    ax_2.set_xlabel(r"Oscillation frequency [Hz]")
+    ax_1.set_xlabel(r"Excitation frequency [Hz]")
+    ax_2.set_xlabel(r"Excitation frequency [Hz]")
     ax_1.set_ylabel(r"$q_1$ amplitude [m]")
     ax_2.set_ylabel(r"$q_2$ amplitude [m]")
     ax_1.grid(True, linewidth=0.5, alpha=0.3)
@@ -180,6 +180,38 @@ def plot_nnm_backbone(sol_nnm, nnm, tdiv, n_mode=1) -> None:
     axs['nnm_ss'].ticklabel_format(axis='both', style='sci', scilimits=(0,0))
     axs['nnm_ss'].grid(True, linewidth=0.5, alpha=0.3)
 
+    fig.show()
+
+
+def plot_superharmonic_nnm(sys_forced: nlsys.NLSystem) -> None:
+    fig, axs = plt.subplots(2,2, figsize=(5, 5), layout="constrained")
+
+    # Frequencies where superharmonics manifest
+    freqs = np.array([[7.8, 13.5], [5.2, 9.2]]);
+
+    y0_guess = 1E-2 * np.array([1, 1, 0, 0])
+    bspan = nlsys.TimeDivision()
+
+    for row in range(2):
+        for col in range(2):
+            bspan.f = freqs[row, col]
+            sol_shooting = shooting.shooting(sys_forced, y0_guess, bspan)
+            sol = solve_ivp(
+                sys_forced.integrand,
+                [0, bspan.T],
+                sol_shooting.y0,
+                args=(bspan.w,),
+                t_eval=np.linspace(0, bspan.T, 300))
+            y = sol.y
+            t_sample = sol.t
+
+            # axs[row, col].plot(t_sample, y[:2, :].T, linewidth=1.4)
+            axs[row, col].plot(y[0, :].T, y[1, :].T, linewidth=1.4)
+            axs[row, col].grid(True, linewidth=0.5, alpha=0.3)
+
+    fig.get_layout_engine().set(hspace=0.15, wspace=0.1)
+    fig.supxlabel(r'time [s]')
+    fig.supylabel(r"$q_1, q_2$ [m]")
     fig.show()
 
 
